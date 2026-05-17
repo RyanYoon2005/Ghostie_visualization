@@ -51,9 +51,11 @@ export default function SavedComparisonsPage() {
   }, []);
 
   const handleLoad = (cmp) => {
-    // Hand off to Premium Analysis which already knows how to load a comparison
-    // by its id (auto-detect via the `load` query param).
-    navigate(`/history?load=${encodeURIComponent(cmp.comparison_id)}`);
+    // Hand the loaded comparison straight to Premium Analysis via navigation state —
+    // no extra API round-trip needed since we already have the businesses array here.
+    navigate('/history', {
+      state: { comparisonBusinesses: cmp.businesses, comparisonName: cmp.name },
+    });
   };
 
   const handleDelete = async (id) => {

@@ -1,4 +1,5 @@
-﻿import { useState, useMemo, useEffect } from 'react';
+﻿import { useState, useMemo, useEffect, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
@@ -105,11 +106,17 @@ export default function HistoryPage() {
   const { token } = useAuth();
   const api = makeApiClient(token);
   const { historyBusiness: business, setHistoryBusiness: setBusiness } = useBusiness();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   // Each company: { key, label, color, data: [{date, score}], stock: [{date, close}] | null }
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingStage, setLoadingStage] = useState('');
+  const [loadingSaved, setLoadingSaved] = useState(false);
   const [error, setError] = useState('');
+  // Guards against React StrictMode replaying the auto-load effect twice in dev.
+  const autoLoadStartedRef = useRef(false);
   const [showBestFit, setShowBestFit] = useState(false);
   const [showSentiment, setShowSentiment] = useState(true);
   const [showStock, setShowStock] = useState(true);
@@ -135,8 +142,15 @@ export default function HistoryPage() {
   // Load history + sentiment + stock for a single business and shape it into a
   // chart-ready object. Returns null on failure so callers can filter it out.
   const loadCompanyData = async (biz, color) => {
-    const params = new URLSearchParams(biz);
-    const stockParams = new URLSearchParams({ business_name: biz.business_name });
+    // Only pass the three keys the analytical endpoints accept — saved comparisons
+    // can come back with extra metadata (business_key etc.) that would otherwise
+    // be forwarded as query params and miss the database match.
+    const params = new URLSearchParams({
+      business_name: biz.business_name ?? '',
+      location:      biz.location      ?? '',
+      category:      biz.category      ?? '',
+    });
+    const stockParams = new URLSearchParams({ business_name: biz.business_name ?? '' });
 
     const [historyRes, sentimentRes, stockRes] = await Promise.all([
       api(`/analytical-model/history?${params}`),
@@ -172,6 +186,11 @@ export default function HistoryPage() {
 
     return {
       key: result.business_key,
+      // Sanitized chart-safe key. Recharts treats dots in dataKey as nested-property
+      // accessors (so `row['a.b']` is read as `row.a.b`) and dies silently when the
+      // key contains them. We also append a random suffix so two companies that
+      // happen to hash to the same business_key still get unique chart columns.
+      chartKey: `co_${String(result.business_key ?? '').replace(/[^a-zA-Z0-9_]/g, '_')}_${Math.random().toString(36).slice(2, 8)}`,
       label: biz.business_name,
       location: biz.location,
       category: biz.category,
@@ -203,30 +222,61 @@ export default function HistoryPage() {
   const removeCompany = (key) => setCompanies((prev) => prev.filter((c) => c.key !== key));
 
   // ── Saved comparisons ──────────────────────────────────────────────────────────
-  // Auto-load when the user arrived from /comparisons with ?load=<id>.
+  // Auto-load when the user arrived from /comparisons via navigation state.
   useEffect(() => {
-    const sp = new URLSearchParams(window.location.search);
-    const loadId = sp.get('load');
-    if (!loadId) return;
+    const incoming = location.state?.comparisonBusinesses;
+    if (!Array.isArray(incoming) || incoming.length === 0) return;
+    if (autoLoadStartedRef.current) return; // StrictMode dev replay guard
+    autoLoadStartedRef.current = true;
+
+    // Clear the state right away so refreshes or back-nav don't replay it.
+    navigate(location.pathname, { replace: true, state: {} });
+
     setLoading(true);
+    setLoadingSaved(true);
     setError('');
-    api(`/users/me/comparisons/${loadId}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then(async (cmp) => {
-        if (!cmp || !cmp.businesses) throw new Error('Could not find that saved comparison.');
-        const slots = cmp.businesses.slice(0, SERIES_COLORS.length);
-        const loaded = await Promise.all(
-          slots.map((biz, i) => loadCompanyData(biz, SERIES_COLORS[i]))
+    setCompanies([]);
+    (async () => {
+      // Load companies one at a time, with a short pause between each — loading
+      // them in parallel triggers the backend's rate limiter on bigger sets.
+      const PAUSE_MS = 750;
+      const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+      const slots = incoming.slice(0, SERIES_COLORS.length);
+      const missed = [];
+
+      for (let i = 0; i < slots.length; i++) {
+        setLoadingStage(`Loading ${i + 1} of ${slots.length}: ${slots[i].business_name}…`);
+        let company = null;
+        try {
+          company = await loadCompanyData(slots[i], SERIES_COLORS[i]);
+        } catch {
+          company = null;
+        }
+        if (company) {
+          // Append to the chart as we go so the user sees progress.
+          setCompanies((prev) => [...prev, company]);
+        } else {
+          missed.push(slots[i]);
+        }
+        if (i < slots.length - 1) await sleep(PAUSE_MS);
+      }
+
+      setLoadingStage('');
+      setLoading(false);
+      setLoadingSaved(false);
+
+      const loadedCount = slots.length - missed.length;
+      if (loadedCount === 0) {
+        setError(
+          `Couldn't load any of the saved companies: ${missed.map((b) => b.business_name).join(', ')}. They may not be in the database yet — try running a Standard Analysis on each first.`,
         );
-        const filtered = loaded.filter(Boolean);
-        if (filtered.length === 0) throw new Error('None of the saved companies have data available.');
-        setCompanies(filtered);
-        // Clear the param so the URL stays clean (and Share generates a fresh hash).
-        window.history.replaceState(null, '', window.location.pathname);
-      })
-      .catch((err) => setError(err.message || 'Could not load the comparison.'))
-      .finally(() => setLoading(false));
-  }, []);
+      } else if (missed.length > 0) {
+        setError(
+          `Loaded ${loadedCount} of ${slots.length} companies. No data for: ${missed.map((b) => `${b.business_name} (${b.location || '—'})`).join(', ')}.`,
+        );
+      }
+    })();
+  }, [location.state]);
 
   const handleSaveComparison = async () => {
     if (companies.length < 2 || !saveName.trim()) return;
@@ -297,7 +347,7 @@ export default function HistoryPage() {
       const longRows = [];
       sourceChartData.forEach((row) => {
         companies.forEach((c) => {
-          if (row[c.key] != null) longRows.push([row.source, c.label, row[c.key]]);
+          if (row[c.chartKey] != null) longRows.push([row.source, c.label, row[c.chartKey]]);
         });
       });
       sections.push({
@@ -382,7 +432,7 @@ export default function HistoryPage() {
     if (companies.length === 0) return { chartData: [] };
 
     const indexed = companies.map((c) => ({
-      key: c.key,
+      chartKey: c.chartKey,
       sentimentMap: new Map(c.data.map((d) => [d.iso, d.score])),
       stockMap: new Map((c.stock ?? []).map((d) => [d.iso, d.close])),
     }));
@@ -398,8 +448,8 @@ export default function HistoryPage() {
     const chartData = sorted.map((iso) => {
       const row = { iso, date: toDateLabel(iso) };
       indexed.forEach((c) => {
-        row[c.key] = c.sentimentMap.has(iso) ? c.sentimentMap.get(iso) : null;
-        row[`${c.key}_stock`] = c.stockMap.has(iso) ? c.stockMap.get(iso) : null;
+        row[c.chartKey] = c.sentimentMap.has(iso) ? c.sentimentMap.get(iso) : null;
+        row[`${c.chartKey}_stock`] = c.stockMap.has(iso) ? c.stockMap.get(iso) : null;
       });
       return row;
     });
@@ -442,7 +492,7 @@ export default function HistoryPage() {
       });
       const avgBySource = {};
       grouped.forEach((v, k) => { avgBySource[k] = Math.round(v.total / v.n); });
-      perCompany.set(c.key, avgBySource);
+      perCompany.set(c.chartKey, avgBySource);
     });
 
     const orderedSources = ['google_maps_reviews', 'newsapi', 'google_news_rss', 'reddit']
@@ -451,8 +501,8 @@ export default function HistoryPage() {
     return orderedSources.map((src) => {
       const row = { source: sourceLabel(src) };
       companies.forEach((c) => {
-        const avg = perCompany.get(c.key)?.[src];
-        if (avg != null) row[c.key] = avg;
+        const avg = perCompany.get(c.chartKey)?.[src];
+        if (avg != null) row[c.chartKey] = avg;
       });
       return row;
     });
@@ -469,13 +519,13 @@ export default function HistoryPage() {
   const bestFitData = useMemo(() => {
     if (!showBestFit || companies.length === 0) return [];
     return companies.map((c) => {
-      const scores = filteredChartData.map((row) => row[c.key] ?? null);
+      const scores = filteredChartData.map((row) => row[c.chartKey] ?? null);
       const defined = scores.filter((v) => v !== null);
       if (defined.length < 2) return null;
       const avg = defined.reduce((a, b) => a + b, 0) / defined.length;
       const filled = scores.map((v) => (v !== null ? v : avg));
       const fit = linearRegression(filled);
-      return { key: `${c.key}_fit`, color: c.color, fit };
+      return { key: `${c.chartKey}_fit`, color: c.color, fit };
     }).filter(Boolean);
   }, [showBestFit, companies, filteredChartData]);
 
@@ -595,7 +645,9 @@ export default function HistoryPage() {
         </DialogActions>
       </Dialog>
 
-      {/* Add company to graph — visually distinct from a normal search form */}
+      {/* Add company to graph — hidden while a saved comparison is being auto-loaded
+          so the page focuses on the in-progress chart. */}
+      {!loadingSaved && (
       <Box sx={{
         ...fadeUp(0.07),
         borderRadius: '14px',
@@ -662,8 +714,24 @@ export default function HistoryPage() {
           </Box>
         )}
       </Box>
+      )}
 
       {error && <Alert severity="error">{error}</Alert>}
+
+      {loading && loadingStage && (
+        <Alert
+          icon={<CircularProgress size={18} sx={{ color: 'hsl(15,45%,42%)' }} />}
+          severity="info"
+          sx={{
+            bgcolor: 'rgba(160,90,60,0.10)',
+            color: 'hsl(0,0%,20%)',
+            border: '1px solid rgba(160,90,60,0.30)',
+            '& .MuiAlert-icon': { color: 'hsl(15,45%,42%)', alignItems: 'center' },
+          }}
+        >
+          {loadingStage}
+        </Alert>
+      )}
 
       {companies.length > 0 && (
         <>
@@ -788,14 +856,14 @@ export default function HistoryPage() {
                               color: 'hsl(0,0%,12%)',
                             }}
                             formatter={(value, key) => {
-                              const co = companies.find((c) => c.key === key);
+                              const co = companies.find((c) => c.chartKey === key);
                               return [`${value}/100`, co ? co.label : key];
                             }}
                           />
                           {companies.map((c) => (
                             <Bar
                               key={c.key}
-                              dataKey={c.key}
+                              dataKey={c.chartKey}
                               fill={c.color}
                               radius={[4, 4, 0, 0]}
                             />
@@ -889,7 +957,7 @@ export default function HistoryPage() {
                 <ComposedChart data={mergedData}>
                   <defs>
                     {companies.map((c) => (
-                      <linearGradient key={c.key} id={`grad_${c.key}`} x1="0" y1="0" x2="0" y2="1">
+                      <linearGradient key={c.key} id={`grad_${c.chartKey}`} x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%"  stopColor={c.color} stopOpacity={0.25} />
                         <stop offset="95%" stopColor={c.color} stopOpacity={0} />
                       </linearGradient>
@@ -935,10 +1003,10 @@ export default function HistoryPage() {
                       if (typeof key !== 'string') return [value, key];
                       if (key.endsWith('_fit')) return null;
                       if (key.endsWith('_stock')) {
-                        const co = companies.find((c) => `${c.key}_stock` === key);
+                        const co = companies.find((c) => `${c.chartKey}_stock` === key);
                         return [`$${Number(value).toFixed(2)}`, co ? `${co.label} (stock)` : 'Stock'];
                       }
-                      const co = companies.find((c) => c.key === key);
+                      const co = companies.find((c) => c.chartKey === key);
                       return [`${value}/100`, co ? `${co.label} (sentiment)` : 'Sentiment'];
                     }}
                   />
@@ -947,10 +1015,10 @@ export default function HistoryPage() {
                     formatter={(value) => {
                       if (value.endsWith('_fit')) return null;
                       if (value.endsWith('_stock')) {
-                        const co = companies.find((c) => `${c.key}_stock` === value);
+                        const co = companies.find((c) => `${c.chartKey}_stock` === value);
                         return co ? `${co.label} (stock)` : value;
                       }
-                      const co = companies.find((c) => c.key === value);
+                      const co = companies.find((c) => c.chartKey === value);
                       return co ? co.label : value;
                     }}
                   />
@@ -960,10 +1028,10 @@ export default function HistoryPage() {
                       key={c.key}
                       yAxisId="sentiment"
                       type="monotone"
-                      dataKey={c.key}
-                      name={c.key}
+                      dataKey={c.chartKey}
+                      name={c.chartKey}
                       stroke={c.color}
-                      fill={`url(#grad_${c.key})`}
+                      fill={`url(#grad_${c.chartKey})`}
                       strokeWidth={2}
                       dot={false}
                       activeDot={{ r: 4, fill: c.color }}
@@ -977,8 +1045,8 @@ export default function HistoryPage() {
                         key={`${c.key}_stock`}
                         yAxisId="stock"
                         type="monotone"
-                        dataKey={`${c.key}_stock`}
-                        name={`${c.key}_stock`}
+                        dataKey={`${c.chartKey}_stock`}
+                        name={`${c.chartKey}_stock`}
                         stroke={c.color}
                         strokeWidth={1.75}
                         strokeDasharray="4 4"
