@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+﻿import { useState, useMemo } from 'react';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
@@ -19,8 +19,14 @@ import TimelineIcon from '@mui/icons-material/Timeline';
 import StarIcon from '@mui/icons-material/Star';
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
+import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
+import DownloadIcon from '@mui/icons-material/Download';
+import ShareIcon from '@mui/icons-material/Share';
+import CheckIcon from '@mui/icons-material/Check';
 import {
   Area,
+  Bar,
+  BarChart,
   Line,
   CartesianGrid,
   ComposedChart,
@@ -30,21 +36,34 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import BarChartIcon from '@mui/icons-material/BarChart';
 import { SentimentBadge } from '../components/SentimentBadge';
 import { StatsCard } from '../components/StatsCard';
 import { makeApiClient } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { BusinessPicker } from '../components/BusinessPicker';
 import { useBusiness } from '../context/BusinessContext';
+import { buildCsv, downloadCsv, safeFilename } from '../utils/csv';
+import { buildSnapshotHash } from '../utils/snapshot';
 
-// Aurora palette — one colour per company slot
+// Distinct boutique palette — one colour per company slot. Hues are well-separated so
+// adjacent series stay legible even when sentiment + stock lines overlap.
 const SERIES_COLORS = [
-  'hsl(142,69%,58%)',  // green
-  'hsl(262,83%,74%)',  // purple
-  'hsl(45,93%,58%)',   // yellow
-  'hsl(200,80%,60%)',  // blue
-  'hsl(0,70%,65%)',    // red
+  'hsl(95, 35%, 38%)',  // green   — sage
+  'hsl(20, 65%, 48%)',  // orange  — burnt terracotta
+  'hsl(210, 50%, 40%)', // blue    — deep dusty blue
+  'hsl(42, 75%, 45%)',  // yellow  — mustard
+  'hsl(280, 35%, 45%)', // purple  — muted aubergine
 ];
+
+const sourceLabel = (s) => {
+  if (s === 'google_maps_reviews') return 'Review';
+  if (s === 'newsapi') return 'News';
+  if (s === 'reddit') return 'Reddit';
+  if (s === 'google_news_rss') return 'Google News';
+  return s || '—';
+};
 
 // Linear regression over an array of numbers → returns predicted values at same indices
 function linearRegression(values) {
@@ -64,8 +83,8 @@ function linearRegression(values) {
 
 const GLASS = {
   borderRadius: '12px',
-  border: '1px solid hsl(230,25%,25%)',
-  bgcolor: 'hsl(228,38%,16%)',
+  border: '1px solid hsl(35,20%,78%)',
+  bgcolor: 'hsl(40,35%,96%)',
 };
 
 const fadeUp = (delay = 0) => ({
@@ -81,12 +100,25 @@ export default function HistoryPage() {
   const api = makeApiClient(token);
   const { historyBusiness: business, setHistoryBusiness: setBusiness } = useBusiness();
 
-  // Each company: { key, label, color, data: [{date, score}] }
+  // Each company: { key, label, color, data: [{date, score}], stock: [{date, close}] | null }
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showBestFit, setShowBestFit] = useState(false);
+  const [showSentiment, setShowSentiment] = useState(true);
+  const [showStock, setShowStock] = useState(true);
   const [dateRange, setDateRange] = useState('all');
+  const [shareCopied, setShareCopied] = useState(false);
+
+  // Canonical day-key: YYYY-MM-DD (sortable lexicographically and unambiguous to parse).
+  const toIso = (d) => {
+    const dt = new Date(d);
+    if (Number.isNaN(dt.getTime())) return null;
+    return dt.toISOString().slice(0, 10);
+  };
+  // Display label for the X axis tick (DD MMM YY).
+  const toDateLabel = (iso) =>
+    new Date(iso).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: '2-digit' });
 
   const handleAdd = async (e) => {
     e.preventDefault();
@@ -95,26 +127,60 @@ export default function HistoryPage() {
     setError('');
     try {
       const params = new URLSearchParams(business);
-      const res = await api(`/analytical-model/history?${params}`);
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || 'Request failed');
-      }
-      const result = await res.json();
 
-      // Deduplicate by date
-      const byDate = new Map();
-      [...result.results].reverse().forEach((r) => {
-        const label = new Date(r.date_time).toLocaleDateString('en-AU', {
-          day: '2-digit', month: 'short', year: '2-digit',
-        });
-        byDate.set(label, r.overall_score);
+      // History (required) + Sentiment snapshot + Stock — all in parallel.
+      const stockParams = new URLSearchParams({ business_name: business.business_name });
+      const [historyRes, sentimentRes, stockRes] = await Promise.all([
+        api(`/analytical-model/history?${params}`),
+        api(`/analytical-model/sentiment?${params}`),
+        api(`/data-collection/stock?${stockParams}`).catch(() => null),
+      ]);
+
+      if (!historyRes.ok) {
+        const err = await historyRes.json().catch(() => ({}));
+        throw new Error(err.detail || 'Could not load history for this company.');
+      }
+      const result = await historyRes.json();
+
+      // Sentiment: deduplicate per day, key by ISO.
+      const sentimentByIso = new Map();
+      result.results.forEach((r) => {
+        const iso = toIso(r.date_time);
+        if (iso) sentimentByIso.set(iso, r.overall_score);
       });
-      const data = Array.from(byDate.entries()).map(([date, score]) => ({ date, score }));
+      const data = Array.from(sentimentByIso.entries()).map(([iso, score]) => ({ iso, score }));
+
+      // Latest sentiment snapshot — for the per-company leaderboard / source-breakdown chart.
+      let snapshot = null;
+      if (sentimentRes.ok) {
+        const sj = await sentimentRes.json();
+        if (!sj.detail) snapshot = sj;
+      }
+
+      // Stock: same shape, ISO-keyed.
+      let stock = null;
+      if (stockRes && stockRes.ok) {
+        const sj = await stockRes.json().catch(() => ({}));
+        if (sj.price_history?.length) {
+          stock = sj.price_history
+            .map((p) => ({ iso: toIso(p.date), close: p.close }))
+            .filter((p) => p.iso);
+        }
+      }
 
       const color = SERIES_COLORS[companies.length];
       const label = business.business_name;
-      setCompanies((prev) => [...prev, { key: result.business_key, label, color, data, results: result.results }]);
+      setCompanies((prev) => [...prev, {
+        key: result.business_key,
+        label,
+        location: business.location,
+        category: business.category,
+        color,
+        data,
+        stock,
+        snapshot,
+        results: result.results,
+      }]);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -124,26 +190,204 @@ export default function HistoryPage() {
 
   const removeCompany = (key) => setCompanies((prev) => prev.filter((c) => c.key !== key));
 
-  // Merge all companies onto a shared date axis
+  const handleDownloadCsv = () => {
+    if (companies.length === 0) return;
+    const sections = [
+      {
+        title: 'Premium Analysis Report',
+        headers: ['Generated', 'Companies Selected'],
+        rows: [[new Date().toISOString(), companies.length]],
+      },
+      {
+        title: 'Selected Leaderboard',
+        headers: ['Rank', 'Business', 'Score', 'Rating', 'Items Analysed', 'Stock Symbol'],
+        rows: leaderboard.map((c, i) => {
+          // Stock array presence is a proxy for "publicly listed".
+          const hasStock = companies.find((x) => x.key === c.key)?.stock?.length > 0;
+          return [i + 1, c.label, c.score ?? '', c.rating ?? '', c.items ?? '', hasStock ? 'yes' : 'no'];
+        }),
+      },
+    ];
+
+    // Keywords per company
+    const kwRows = [];
+    companies.forEach((c) => {
+      const ks = c.snapshot?.keyword_split;
+      if (ks?.positive?.length || ks?.negative?.length) {
+        (ks.positive ?? []).forEach((kw) => kwRows.push([c.label, 'positive', kw]));
+        (ks.negative ?? []).forEach((kw) => kwRows.push([c.label, 'negative', kw]));
+      } else {
+        (c.snapshot?.keywords ?? []).forEach((kw) => kwRows.push([c.label, '', kw]));
+      }
+    });
+    if (kwRows.length) {
+      sections.push({ title: 'Keywords', headers: ['Business', 'Polarity', 'Keyword'], rows: kwRows });
+    }
+
+    // Source comparison — long format (one row per company × source)
+    if (sourceChartData.length) {
+      const longRows = [];
+      sourceChartData.forEach((row) => {
+        companies.forEach((c) => {
+          if (row[c.key] != null) longRows.push([row.source, c.label, row[c.key]]);
+        });
+      });
+      sections.push({
+        title: 'Source Comparison (avg score per source)',
+        headers: ['Source', 'Business', 'Avg Score'],
+        rows: longRows,
+      });
+    }
+
+    // Sentiment history — long format
+    const sentRows = [];
+    companies.forEach((c) => {
+      c.data.forEach((pt) => sentRows.push([pt.iso, c.label, pt.score]));
+    });
+    sentRows.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+    if (sentRows.length) {
+      sections.push({ title: 'Sentiment History', headers: ['Date', 'Business', 'Score'], rows: sentRows });
+    }
+
+    // Stock price history — long format
+    const stkRows = [];
+    companies.forEach((c) => {
+      c.stock?.forEach((pt) => stkRows.push([pt.iso, c.label, pt.close]));
+    });
+    stkRows.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+    if (stkRows.length) {
+      sections.push({ title: 'Stock Price History', headers: ['Date', 'Business', 'Close'], rows: stkRows });
+    }
+
+    // Per-company analysis timeline (one row per run)
+    const tlRows = [];
+    companies.forEach((c) => {
+      (c.results ?? []).forEach((r) => {
+        tlRows.push([r.date_time, c.label, r.overall_score, r.overall_rating, r.overall_sentiment]);
+      });
+    });
+    tlRows.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+    if (tlRows.length) {
+      sections.push({
+        title: 'Analysis Timeline (every run)',
+        headers: ['Timestamp', 'Business', 'Score', 'Rating', 'Sentiment'],
+        rows: tlRows,
+      });
+    }
+
+    const slug = companies.map((c) => safeFilename(c.label)).join('_vs_');
+    downloadCsv(`${slug || 'premium'}-analysis.csv`, buildCsv(sections));
+  };
+
+  // Build a public /compare URL with one `c=<name>|<location>|<category>` per company,
+  // and embed a compressed snapshot of the loaded data in the hash so the receiver's
+  // page renders instantly. If the snapshot is stripped (e.g. by Slack truncation),
+  // the c= params still let the page fetch fresh data on its own.
+  const handleShareComparison = async () => {
+    if (companies.length === 0) return;
+    const params = new URLSearchParams();
+    companies.forEach((c) => {
+      params.append('c', `${c.label}|${c.location ?? ''}|${c.category ?? ''}`);
+    });
+    const hash = buildSnapshotHash({
+      companies: companies.map((c) => ({
+        key: c.key,
+        label: c.label,
+        location: c.location,
+        category: c.category,
+        color: c.color,
+        data: c.data,
+        stock: c.stock,
+        snapshot: c.snapshot,
+        results: c.results,
+      })),
+    });
+    const url = `${window.location.origin}/compare?${params.toString()}${hash}`;
+    try { await navigator.clipboard.writeText(url); } catch { /* clipboard blocked — non-fatal */ }
+    setShareCopied(true);
+    setTimeout(() => setShareCopied(false), 2000);
+  };
+
+  // Merge every company's sentiment + stock onto one chronologically-sorted axis (keyed by ISO).
+  // O(d) lookups via per-company Maps instead of nested .find() calls.
   const { chartData } = useMemo(() => {
-    if (companies.length === 0) return { chartData: [], allDates: [] };
+    if (companies.length === 0) return { chartData: [] };
 
-    const dateSet = new Map();
-    companies.forEach((c) => c.data.forEach(({ date }) => {
-      if (!dateSet.has(date)) dateSet.set(date, true);
+    const indexed = companies.map((c) => ({
+      key: c.key,
+      sentimentMap: new Map(c.data.map((d) => [d.iso, d.score])),
+      stockMap: new Map((c.stock ?? []).map((d) => [d.iso, d.close])),
     }));
-    const allDates = Array.from(dateSet.keys());
 
-    const chartData = allDates.map((date) => {
-      const row = { date };
-      companies.forEach((c) => {
-        const point = c.data.find((d) => d.date === date);
-        row[c.key] = point ? point.score : null;
+    const allIsos = new Set();
+    indexed.forEach((c) => {
+      c.sentimentMap.forEach((_, iso) => allIsos.add(iso));
+      c.stockMap.forEach((_, iso) => allIsos.add(iso));
+    });
+
+    const sorted = Array.from(allIsos).sort(); // ISO strings sort chronologically
+
+    const chartData = sorted.map((iso) => {
+      const row = { iso, date: toDateLabel(iso) };
+      indexed.forEach((c) => {
+        row[c.key] = c.sentimentMap.has(iso) ? c.sentimentMap.get(iso) : null;
+        row[`${c.key}_stock`] = c.stockMap.has(iso) ? c.stockMap.get(iso) : null;
       });
       return row;
     });
 
     return { chartData };
+  }, [companies]);
+
+  const anyStock = companies.some((c) => c.stock?.length > 0);
+
+  // Mini leaderboard — ranked by latest sentiment score, including top keywords.
+  const leaderboard = useMemo(() => {
+    return companies
+      .map((c) => ({
+        key: c.key,
+        label: c.label,
+        color: c.color,
+        score: c.snapshot?.overall_score ?? null,
+        rating: c.snapshot?.overall_rating ?? null,
+        keywords: c.snapshot?.keyword_split ?? null,
+        flatKeywords: c.snapshot?.keywords ?? [],
+        items: c.snapshot?.items_analysed ?? 0,
+      }))
+      .sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
+  }, [companies]);
+
+  // Per-source comparison data — X-axis = source, one bar per company.
+  // Each row averages a company's breakdown items grouped by source.
+  const sourceChartData = useMemo(() => {
+    const sourcesPresent = new Set();
+    const perCompany = new Map();
+
+    companies.forEach((c) => {
+      const grouped = new Map(); // src -> { total, n }
+      (c.snapshot?.breakdown ?? []).forEach((item) => {
+        sourcesPresent.add(item.source);
+        const slot = grouped.get(item.source) ?? { total: 0, n: 0 };
+        slot.total += item.score;
+        slot.n += 1;
+        grouped.set(item.source, slot);
+      });
+      const avgBySource = {};
+      grouped.forEach((v, k) => { avgBySource[k] = Math.round(v.total / v.n); });
+      perCompany.set(c.key, avgBySource);
+    });
+
+    const orderedSources = ['google_maps_reviews', 'newsapi', 'google_news_rss', 'reddit']
+      .filter((s) => sourcesPresent.has(s));
+
+    return orderedSources.map((src) => {
+      const row = { source: sourceLabel(src) };
+      companies.forEach((c) => {
+        const avg = perCompany.get(c.key)?.[src];
+        if (avg != null) row[c.key] = avg;
+      });
+      return row;
+    });
   }, [companies]);
 
   // Apply date range filter
@@ -188,54 +432,108 @@ export default function HistoryPage() {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-      <Box sx={fadeUp(0)}>
-        <Typography variant="h4" fontWeight={700} sx={{ fontFamily: '"Sora", sans-serif', color: 'hsl(210,40%,93%)' }}>
-          Sentiment History
-        </Typography>
-        <Typography variant="body2" sx={{ color: 'hsl(215,20%,60%)', mt: 0.5 }}>
-          Compare sentiment trends across multiple companies over time.
-        </Typography>
+      <Box sx={{ ...fadeUp(0), display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
+        <Box>
+          <Typography variant="h4" fontWeight={700} sx={{ fontFamily: '"Sora", sans-serif', color: 'hsl(0,0%,12%)' }}>
+            Premium Analysis
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'hsl(0,0%,35%)', mt: 0.5 }}>
+            Compare sentiment trends across multiple companies over time.
+          </Typography>
+        </Box>
+        {companies.length > 0 && (
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={shareCopied ? <CheckIcon /> : <ShareIcon />}
+              onClick={handleShareComparison}
+              sx={{
+                color: shareCopied ? 'hsl(95,25%,32%)' : undefined,
+                borderColor: shareCopied ? 'hsl(95,25%,42%)' : undefined,
+              }}
+            >
+              {shareCopied ? 'Link copied' : 'Share comparison'}
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<DownloadIcon />}
+              onClick={handleDownloadCsv}
+            >
+              Download CSV
+            </Button>
+          </Box>
+        )}
       </Box>
 
-      {/* Add company form */}
-      <Card variant="outlined" sx={fadeUp(0.07)}>
-        <CardContent sx={{ p: '16px !important' }}>
-          <Box component="form" onSubmit={handleAdd} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <BusinessPicker business={business} setBusiness={setBusiness} />
-            <Box>
-              <Button
-                type="submit"
-                variant="contained"
-                disabled={loading || !canAddMore}
-                startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <AddIcon />}
-                sx={{ minWidth: 140 }}
-              >
-                {loading ? 'Loading…' : canAddMore ? 'Add Company' : 'Max reached'}
-              </Button>
-            </Box>
-          </Box>
+      {/* Add company to graph — visually distinct from a normal search form */}
+      <Box sx={{
+        ...fadeUp(0.07),
+        borderRadius: '14px',
+        border: '1px dashed hsl(35,20%,60%)',
+        bgcolor: 'hsl(40,40%,93%)',
+        p: 2.5,
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+          <CompareArrowsIcon sx={{ color: 'hsl(15,45%,42%)', fontSize: 22 }} />
+          <Typography variant="subtitle1" fontWeight={700} sx={{ fontFamily: '"Sora", sans-serif', color: 'hsl(0,0%,12%)' }}>
+            Add a company to the comparison graph
+          </Typography>
+          <Chip
+            label={`${companies.length} / ${SERIES_COLORS.length}`}
+            size="small"
+            sx={{
+              ml: 'auto',
+              bgcolor: 'rgba(0,0,0,0.05)',
+              color: 'hsl(0,0%,25%)',
+              fontWeight: 600,
+            }}
+          />
+        </Box>
+        <Typography variant="body2" sx={{ color: 'hsl(0,0%,40%)', mb: 2 }}>
+          Each company you add gets its own coloured line on the chart below. Up to {SERIES_COLORS.length} at once.
+        </Typography>
 
-          {/* Active company chips */}
-          {companies.length > 0 && (
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 2 }}>
-              {companies.map((c) => (
-                <Chip
-                  key={c.key}
-                  label={c.label}
-                  size="small"
-                  onDelete={() => removeCompany(c.key)}
-                  sx={{
-                    bgcolor: `${c.color}22`,
-                    border: `1px solid ${c.color}55`,
-                    color: c.color,
-                    '& .MuiChip-deleteIcon': { color: c.color },
-                  }}
-                />
-              ))}
-            </Box>
-          )}
-        </CardContent>
-      </Card>
+        <Box component="form" onSubmit={handleAdd} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <BusinessPicker business={business} setBusiness={setBusiness} />
+          <Box>
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={loading || !canAddMore || !business.business_name}
+              startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <AddIcon />}
+              sx={{ minWidth: 180 }}
+            >
+              {loading ? 'Loading…' : canAddMore ? 'Add to graph' : 'Max reached'}
+            </Button>
+          </Box>
+        </Box>
+
+        {/* Active company chips */}
+        {companies.length > 0 && (
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1, mt: 2, pt: 2, borderTop: '1px solid hsl(35,20%,78%)' }}>
+            <Typography variant="caption" sx={{ color: 'hsl(0,0%,35%)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, mr: 0.5 }}>
+              On the graph:
+            </Typography>
+            {companies.map((c) => (
+              <Chip
+                key={c.key}
+                label={c.stock?.length ? `${c.label} · 📈` : c.label}
+                size="small"
+                onDelete={() => removeCompany(c.key)}
+                sx={{
+                  bgcolor: `${c.color}22`,
+                  border: `1px solid ${c.color}55`,
+                  color: c.color,
+                  fontWeight: 600,
+                  '& .MuiChip-deleteIcon': { color: c.color },
+                }}
+              />
+            ))}
+          </Box>
+        )}
+      </Box>
 
       {error && <Alert severity="error">{error}</Alert>}
 
@@ -243,14 +541,154 @@ export default function HistoryPage() {
         <>
           {/* Stats */}
           <Grid container spacing={2} sx={fadeUp(0.1)}>
-            <Grid item xs={12} md={4}>
+            <Grid size={{ xs: 12, md: 4 }}>
               <StatsCard label="Avg Score" value={avgScore ?? '—'} icon={TimelineIcon} glow="green" />
             </Grid>
-            <Grid item xs={12} md={4}>
+            <Grid size={{ xs: 12, md: 4 }}>
               <StatsCard label="Companies" value={companies.length} icon={CalendarMonthIcon} />
             </Grid>
-            <Grid item xs={12} md={4}>
+            <Grid size={{ xs: 12, md: 4 }}>
               <StatsCard label="Peak Score" value={peakScore ?? '—'} icon={StarIcon} glow="purple" />
+            </Grid>
+          </Grid>
+
+          {/* Mini leaderboard + per-source comparison */}
+          <Grid container spacing={2} sx={fadeUp(0.13)}>
+            {/* Leaderboard */}
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Box sx={{ ...GLASS, overflow: 'hidden', height: '100%' }}>
+                <Box sx={{ px: 2.5, py: 1.5, borderBottom: '1px solid hsl(35,20%,78%)', display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <EmojiEventsIcon sx={{ fontSize: 19, color: 'hsl(38,55%,32%)' }} />
+                  <Box>
+                    <Typography variant="subtitle2" fontWeight={600} sx={{ fontFamily: '"Sora", sans-serif', color: 'hsl(0,0%,12%)' }}>
+                      Selected Leaderboard
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'hsl(0,0%,40%)' }}>
+                      Latest sentiment scores + top keywords for the companies you've added
+                    </Typography>
+                  </Box>
+                </Box>
+                {leaderboard.map((c, i) => (
+                  <Box key={c.key} sx={{
+                    px: 2.5, py: 2,
+                    borderBottom: i < leaderboard.length - 1 ? '1px solid hsl(35,20%,78%)' : 'none',
+                  }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: c.keywords || c.flatKeywords.length ? 1 : 0 }}>
+                      <Box sx={{
+                        width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontWeight: 700, fontSize: 14,
+                        bgcolor: `${c.color}22`, color: c.color, border: `1px solid ${c.color}55`,
+                      }}>
+                        {i + 1}
+                      </Box>
+                      <Typography variant="body1" fontWeight={600} sx={{ color: 'hsl(0,0%,12%)', flex: 1, minWidth: 0 }} noWrap>
+                        {c.label}
+                      </Typography>
+                      {c.score != null
+                        ? <SentimentBadge score={c.score} size="sm" />
+                        : <Typography variant="caption" sx={{ color: 'hsl(0,0%,45%)' }}>No data</Typography>}
+                    </Box>
+
+                    {/* Keywords — split by polarity when available */}
+                    {c.keywords && (c.keywords.positive?.length > 0 || c.keywords.negative?.length > 0) ? (
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, pl: 4.25 }}>
+                        {c.keywords.positive?.slice(0, 5).map((kw) => (
+                          <Chip key={`p-${kw}`} label={`+ ${kw}`} size="small" sx={{
+                            bgcolor: 'rgba(120,135,90,0.14)', color: 'hsl(95,25%,28%)',
+                            border: '1px solid rgba(120,135,90,0.30)', height: 22, fontSize: 13,
+                          }} />
+                        ))}
+                        {c.keywords.negative?.slice(0, 5).map((kw) => (
+                          <Chip key={`n-${kw}`} label={`− ${kw}`} size="small" sx={{
+                            bgcolor: 'rgba(180,80,60,0.10)', color: 'hsl(10,50%,32%)',
+                            border: '1px solid rgba(180,80,60,0.30)', height: 22, fontSize: 13,
+                          }} />
+                        ))}
+                      </Box>
+                    ) : c.flatKeywords.length > 0 ? (
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, pl: 4.25 }}>
+                        {c.flatKeywords.slice(0, 6).map((kw) => (
+                          <Chip key={kw} label={kw} size="small" sx={{
+                            bgcolor: 'rgba(0,0,0,0.04)', color: 'hsl(0,0%,25%)',
+                            border: '1px solid hsl(35,20%,78%)', height: 22, fontSize: 13,
+                          }} />
+                        ))}
+                      </Box>
+                    ) : null}
+                  </Box>
+                ))}
+              </Box>
+            </Grid>
+
+            {/* Source breakdown comparison */}
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Box sx={{ ...GLASS, overflow: 'hidden', height: '100%' }}>
+                <Box sx={{ px: 2.5, py: 1.5, borderBottom: '1px solid hsl(35,20%,78%)', display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <BarChartIcon sx={{ fontSize: 19, color: 'hsl(210,50%,40%)' }} />
+                  <Box>
+                    <Typography variant="subtitle2" fontWeight={600} sx={{ fontFamily: '"Sora", sans-serif', color: 'hsl(0,0%,12%)' }}>
+                      Source Comparison
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'hsl(0,0%,40%)' }}>
+                      Average score per source — one bar per company, grouped by source
+                    </Typography>
+                  </Box>
+                </Box>
+                <Box sx={{ p: 2 }}>
+                  {sourceChartData.length === 0 ? (
+                    <Typography variant="body2" sx={{ color: 'hsl(0,0%,45%)', textAlign: 'center', py: 4 }}>
+                      No source breakdown available yet.
+                    </Typography>
+                  ) : (
+                    <>
+                      <ResponsiveContainer width="100%" height={Math.max(220, 60 * sourceChartData.length + 60)}>
+                        <BarChart data={sourceChartData} barGap={4}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(35,20%,78%)" vertical={false} />
+                          <XAxis dataKey="source" stroke="hsl(0,0%,35%)" tick={{ fill: 'hsl(0,0%,35%)', fontSize: 14 }} />
+                          <YAxis
+                            domain={[0, 100]}
+                            stroke="hsl(0,0%,35%)"
+                            tick={{ fill: 'hsl(0,0%,35%)', fontSize: 13 }}
+                            width={36}
+                          />
+                          <ReTooltip
+                            contentStyle={{
+                              backgroundColor: 'hsl(40,35%,96%)',
+                              border: '1px solid hsl(35,20%,78%)',
+                              borderRadius: 8,
+                              color: 'hsl(0,0%,12%)',
+                            }}
+                            formatter={(value, key) => {
+                              const co = companies.find((c) => c.key === key);
+                              return [`${value}/100`, co ? co.label : key];
+                            }}
+                          />
+                          {companies.map((c) => (
+                            <Bar
+                              key={c.key}
+                              dataKey={c.key}
+                              fill={c.color}
+                              radius={[4, 4, 0, 0]}
+                            />
+                          ))}
+                        </BarChart>
+                      </ResponsiveContainer>
+                      {/* Legend mapping colour → company */}
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 2, mt: 1 }}>
+                        {companies.map((c) => (
+                          <Box key={c.key} sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                            <Box sx={{ width: 10, height: 10, borderRadius: 2, bgcolor: c.color }} />
+                            <Typography variant="caption" sx={{ color: 'hsl(0,0%,30%)' }}>
+                              {c.label}
+                            </Typography>
+                          </Box>
+                        ))}
+                      </Box>
+                    </>
+                  )}
+                </Box>
+              </Box>
             </Grid>
           </Grid>
 
@@ -258,10 +696,10 @@ export default function HistoryPage() {
           {chartData.length > 1 && (
             <Box sx={{ ...GLASS, p: 3, ...fadeUp(0.17) }}>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, flexWrap: 'wrap', gap: 1.5 }}>
-                <Typography variant="subtitle2" fontWeight={600} sx={{ fontFamily: '"Sora", sans-serif', color: 'hsl(210,40%,93%)' }}>
-                  Sentiment Trend
+                <Typography variant="subtitle2" fontWeight={600} sx={{ fontFamily: '"Sora", sans-serif', color: 'hsl(0,0%,12%)' }}>
+                  Sentiment vs Stock Price
                 </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
                   <ToggleButtonGroup
                     value={dateRange}
                     exclusive
@@ -269,9 +707,9 @@ export default function HistoryPage() {
                     size="small"
                     sx={{
                       '& .MuiToggleButton-root': {
-                        color: 'hsl(215,20%,60%)', border: '1px solid hsl(230,25%,25%)',
-                        fontSize: 11, px: 1.5, py: 0.25,
-                        '&.Mui-selected': { color: 'hsl(142,69%,58%)', bgcolor: 'rgba(46,200,110,0.1)', borderColor: 'rgba(46,200,110,0.3)' },
+                        color: 'hsl(0,0%,35%)', border: '1px solid hsl(35,20%,78%)',
+                        fontSize: 14, px: 1.5, py: 0.25,
+                        '&.Mui-selected': { color: 'hsl(95,25%,42%)', bgcolor: 'rgba(120,135,90,0.12)', borderColor: 'rgba(120,135,90,0.25)' },
                       },
                     }}
                   >
@@ -282,18 +720,44 @@ export default function HistoryPage() {
                   <FormControlLabel
                     control={
                       <Switch
+                        checked={showSentiment}
+                        onChange={(e) => setShowSentiment(e.target.checked)}
+                        size="small"
+                      />
+                    }
+                    label={<Typography variant="caption" sx={{ color: 'hsl(0,0%,35%)' }}>Sentiment</Typography>}
+                    sx={{ m: 0 }}
+                  />
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={showStock}
+                        onChange={(e) => setShowStock(e.target.checked)}
+                        size="small"
+                        disabled={!anyStock}
+                      />
+                    }
+                    label={
+                      <Typography variant="caption" sx={{ color: anyStock ? 'hsl(0,0%,35%)' : 'hsl(0,0%,55%)' }}>
+                        Stock price{!anyStock ? ' (n/a)' : ''}
+                      </Typography>
+                    }
+                    sx={{ m: 0 }}
+                  />
+                  <FormControlLabel
+                    control={
+                      <Switch
                         checked={showBestFit}
                         onChange={(e) => setShowBestFit(e.target.checked)}
                         size="small"
-                        sx={{ '& .MuiSwitch-thumb': { bgcolor: 'hsl(142,69%,58%)' }, '& .Mui-checked + .MuiSwitch-track': { bgcolor: 'hsl(142,69%,38%)' } }}
                       />
                     }
-                    label={<Typography variant="caption" sx={{ color: 'hsl(215,20%,60%)' }}>Best-fit</Typography>}
+                    label={<Typography variant="caption" sx={{ color: 'hsl(0,0%,35%)' }}>Best-fit</Typography>}
                     sx={{ m: 0 }}
                   />
                 </Box>
               </Box>
-              <ResponsiveContainer width="100%" height={320}>
+              <ResponsiveContainer width="100%" height={340}>
                 <ComposedChart data={mergedData}>
                   <defs>
                     {companies.map((c) => (
@@ -303,39 +767,70 @@ export default function HistoryPage() {
                       </linearGradient>
                     ))}
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(230,25%,25%)" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(35,20%,78%)" />
                   <XAxis
                     dataKey="date"
-                    stroke="hsl(215,20%,60%)"
-                    tick={{ fill: 'hsl(215,20%,60%)', fontSize: 11 }}
+                    stroke="hsl(0,0%,35%)"
+                    tick={{ fill: 'hsl(0,0%,35%)', fontSize: 14 }}
+                    minTickGap={40}
                   />
+                  {/* Left axis: sentiment (0–100). Render even when hidden so layout stays stable. */}
                   <YAxis
+                    yAxisId="sentiment"
                     domain={[0, 100]}
-                    stroke="hsl(215,20%,60%)"
-                    tick={{ fill: 'hsl(215,20%,60%)', fontSize: 11 }}
+                    stroke="hsl(0,0%,35%)"
+                    tick={{ fill: 'hsl(0,0%,35%)', fontSize: 14 }}
+                    label={{ value: 'Sentiment', angle: -90, position: 'insideLeft', fill: 'hsl(0,0%,40%)', fontSize: 13 }}
+                    hide={!showSentiment}
                   />
+                  {/* Right axis: stock price ($). Only shown if at least one company is publicly listed AND the toggle is on. */}
+                  {showStock && anyStock && (
+                    <YAxis
+                      yAxisId="stock"
+                      orientation="right"
+                      domain={['dataMin', 'dataMax']}
+                      stroke="hsl(0,0%,35%)"
+                      tick={{ fill: 'hsl(0,0%,35%)', fontSize: 14 }}
+                      tickFormatter={(v) => `$${Math.round(v)}`}
+                      label={{ value: 'Stock $', angle: 90, position: 'insideRight', fill: 'hsl(0,0%,40%)', fontSize: 13 }}
+                    />
+                  )}
                   <ReTooltip
                     contentStyle={{
-                      backgroundColor: 'hsl(228,38%,16%)',
-                      border: '1px solid hsl(230,25%,25%)',
+                      backgroundColor: 'hsl(40,35%,96%)',
+                      border: '1px solid hsl(35,20%,78%)',
                       borderRadius: '8px',
-                      color: 'hsl(210,40%,93%)',
+                      color: 'hsl(0,0%,12%)',
                     }}
-                    labelStyle={{ color: 'hsl(210,40%,93%)', fontWeight: 600, marginBottom: 4 }}
+                    labelStyle={{ color: 'hsl(0,0%,12%)', fontWeight: 600, marginBottom: 4 }}
+                    formatter={(value, key) => {
+                      if (typeof key !== 'string') return [value, key];
+                      if (key.endsWith('_fit')) return null;
+                      if (key.endsWith('_stock')) {
+                        const co = companies.find((c) => `${c.key}_stock` === key);
+                        return [`$${Number(value).toFixed(2)}`, co ? `${co.label} (stock)` : 'Stock'];
+                      }
+                      const co = companies.find((c) => c.key === key);
+                      return [`${value}/100`, co ? `${co.label} (sentiment)` : 'Sentiment'];
+                    }}
                   />
                   <Legend
-                    wrapperStyle={{ color: 'hsl(215,20%,60%)', fontSize: 12, paddingTop: 12 }}
+                    wrapperStyle={{ color: 'hsl(0,0%,35%)', fontSize: 15, paddingTop: 12 }}
                     formatter={(value) => {
-                      // Hide best-fit entries from legend
                       if (value.endsWith('_fit')) return null;
+                      if (value.endsWith('_stock')) {
+                        const co = companies.find((c) => `${c.key}_stock` === value);
+                        return co ? `${co.label} (stock)` : value;
+                      }
                       const co = companies.find((c) => c.key === value);
                       return co ? co.label : value;
                     }}
                   />
-                  {/* Area series per company */}
-                  {companies.map((c) => (
+                  {/* Sentiment area per company */}
+                  {showSentiment && companies.map((c) => (
                     <Area
                       key={c.key}
+                      yAxisId="sentiment"
                       type="monotone"
                       dataKey={c.key}
                       name={c.key}
@@ -347,10 +842,29 @@ export default function HistoryPage() {
                       connectNulls
                     />
                   ))}
-                  {/* Best-fit lines (dashed) */}
-                  {showBestFit && bestFitData.map((bf) => (
+                  {/* Stock line per company — dashed to differentiate from sentiment area */}
+                  {showStock && anyStock && companies.map((c) => (
+                    c.stock?.length ? (
+                      <Line
+                        key={`${c.key}_stock`}
+                        yAxisId="stock"
+                        type="monotone"
+                        dataKey={`${c.key}_stock`}
+                        name={`${c.key}_stock`}
+                        stroke={c.color}
+                        strokeWidth={1.75}
+                        strokeDasharray="4 4"
+                        dot={false}
+                        activeDot={{ r: 3, fill: c.color }}
+                        connectNulls
+                      />
+                    ) : null
+                  ))}
+                  {/* Best-fit lines over sentiment (dashed) */}
+                  {showSentiment && showBestFit && bestFitData.map((bf) => (
                     <Line
                       key={bf.key}
+                      yAxisId="sentiment"
                       type="linear"
                       dataKey={bf.key}
                       name={bf.key}
@@ -372,16 +886,16 @@ export default function HistoryPage() {
             <Box key={c.key} sx={{ ...GLASS, overflow: 'hidden' }}>
               <Box sx={{
                 px: 2.5, py: 1.5,
-                borderBottom: '1px solid hsl(230,25%,25%)',
-                bgcolor: 'rgba(255,255,255,0.03)',
+                borderBottom: '1px solid hsl(35,20%,78%)',
+                bgcolor: 'rgba(0,0,0,0.035)',
                 display: 'flex', alignItems: 'center', gap: 1.5,
               }}>
                 <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: c.color, flexShrink: 0 }} />
-                <Typography variant="subtitle1" fontWeight={600} sx={{ fontFamily: '"Sora", sans-serif', color: 'hsl(210,40%,93%)' }}>
+                <Typography variant="subtitle1" fontWeight={600} sx={{ fontFamily: '"Sora", sans-serif', color: 'hsl(0,0%,12%)' }}>
                   {c.label} — Analysis Timeline
                 </Typography>
                 <Tooltip title="Remove company">
-                  <IconButton size="small" onClick={() => removeCompany(c.key)} sx={{ ml: 'auto', color: 'hsl(215,20%,60%)' }}>
+                  <IconButton size="small" onClick={() => removeCompany(c.key)} sx={{ ml: 'auto', color: 'hsl(0,0%,35%)' }}>
                     <CloseIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>
@@ -392,9 +906,9 @@ export default function HistoryPage() {
                   sx={{
                     display: 'flex', alignItems: 'center', gap: 2,
                     px: 2.5, py: 2,
-                    borderBottom: '1px solid hsl(230,25%,25%)',
+                    borderBottom: '1px solid hsl(35,20%,78%)',
                     '&:last-child': { borderBottom: 0 },
-                    '&:hover': { bgcolor: 'rgba(255,255,255,0.03)' },
+                    '&:hover': { bgcolor: 'rgba(0,0,0,0.035)' },
                     transition: 'background 0.15s',
                   }}
                 >
@@ -402,12 +916,12 @@ export default function HistoryPage() {
                     <Typography variant="body2" fontWeight={500} sx={{ color: 'hsl(210,40%,85%)', display: 'block' }}>
                       {new Date(r.date_time).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })}
                     </Typography>
-                    <Typography variant="body2" sx={{ color: 'hsl(215,20%,55%)' }}>
+                    <Typography variant="body2" sx={{ color: 'hsl(0,0%,40%)' }}>
                       {new Date(r.date_time).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}
                     </Typography>
                   </Box>
                   <SentimentBadge score={r.overall_score} size="md" />
-                  <Typography variant="body1" sx={{ flex: 1, color: 'hsl(215,20%,75%)' }}>
+                  <Typography variant="body1" sx={{ flex: 1, color: 'hsl(0,0%,22%)' }}>
                     {'⭐'.repeat(r.overall_rating)} · {r.overall_sentiment}
                   </Typography>
                 </Box>

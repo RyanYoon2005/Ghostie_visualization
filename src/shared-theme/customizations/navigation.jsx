@@ -172,45 +172,35 @@ export const navigationCustomizations = {
   MuiTabs: {
     styleOverrides: {
       root: { minHeight: 'fit-content' },
-      indicator: ({ theme }) => ({
-        backgroundColor: (theme.vars || theme).palette.grey[800],
-        ...theme.applyStyles('dark', {
-          backgroundColor: (theme.vars || theme).palette.grey[200],
-        }),
-      }),
+      indicator: {
+        backgroundColor: 'hsl(0,0%,12%)',
+        height: 2,
+      },
     },
   },
   MuiTab: {
     styleOverrides: {
-      root: ({ theme }) => ({
-        padding: '6px 8px',
+      root: {
+        padding: '6px 10px',
         marginBottom: '8px',
         textTransform: 'none',
         minWidth: 'fit-content',
         minHeight: 'fit-content',
-        color: (theme.vars || theme).palette.text.secondary,
-        borderRadius: (theme.vars || theme).shape.borderRadius,
-        border: '1px solid',
-        borderColor: 'transparent',
+        color: 'hsl(0,0%,35%)',
+        fontWeight: 500,
+        borderRadius: 6,
+        border: '1px solid transparent',
+        transition: 'background-color 120ms ease, color 120ms ease',
         ':hover': {
-          color: (theme.vars || theme).palette.text.primary,
-          backgroundColor: gray[100],
-          borderColor: gray[200],
+          color: 'hsl(0,0%,15%)',
+          backgroundColor: 'rgba(0,0,0,0.06)',
+          borderColor: 'transparent',
         },
         [`&.${tabClasses.selected}`]: {
-          color: gray[900],
+          color: 'hsl(0,0%,8%)',
+          fontWeight: 700,
         },
-        ...theme.applyStyles('dark', {
-          ':hover': {
-            color: (theme.vars || theme).palette.text.primary,
-            backgroundColor: gray[800],
-            borderColor: gray[700],
-          },
-          [`&.${tabClasses.selected}`]: {
-            color: '#fff',
-          },
-        }),
-      }),
+      },
     },
   },
   MuiStepConnector: {

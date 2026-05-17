@@ -10,10 +10,9 @@ import DashboardPage from './pages/DashboardPage';
 import SentimentPage from './pages/SentimentPage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import HistoryPage from './pages/HistoryPage';
-import DataCollectionPage from './pages/DataCollectionPage';
-import DataRetrievalPage from './pages/DataRetrievalPage';
 import FavouritesPage from './pages/FavouritesPage';
 import ScoreCardPage from './pages/ScoreCardPage';
+import ComparePage from './pages/ComparePage';
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuth();
@@ -35,6 +34,7 @@ export default function App() {
         <AuthProvider>
           <Routes>
             <Route path="/score/:name" element={<ScoreCardPage />} />
+            <Route path="/compare" element={<ComparePage />} />
             <Route path="/signin" element={<GuestRoute><SignInPage /></GuestRoute>} />
             <Route path="/signup" element={<GuestRoute><SignUpPage /></GuestRoute>} />
             <Route path="/*" element={
@@ -48,8 +48,6 @@ export default function App() {
                         <Route path="/leaderboard" element={<LeaderboardPage />} />
                         <Route path="/history"     element={<HistoryPage />} />
                         <Route path="/favourites"  element={<FavouritesPage />} />
-                        <Route path="/collect"     element={<DataCollectionPage />} />
-                        <Route path="/retrieval"   element={<DataRetrievalPage />} />
                       </Routes>
                     </Layout>
                   </ToastProvider>

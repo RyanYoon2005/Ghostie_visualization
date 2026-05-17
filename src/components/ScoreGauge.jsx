@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 
 const scoreColor = (s) => {
-  if (s >= 57.5) return 'hsl(142,69%,58%)';
-  if (s >= 42.5) return 'hsl(45,93%,58%)';
-  return 'hsl(0,84%,60%)';
+  if (s >= 57.5) return 'hsl(95,25%,42%)';
+  if (s >= 42.5) return 'hsl(38,55%,48%)';
+  return 'hsl(10,50%,45%)';
 };
 
 const scoreLabel = (s) => {
@@ -44,7 +44,7 @@ export function ScoreGauge({ score, size = 200, label = 'Overall Score', showLab
           <circle
             cx={size / 2} cy={size / 2} r={radius}
             fill="none"
-            stroke="rgba(255,255,255,0.07)"
+            stroke="rgba(0,0,0,0.07)"
             strokeWidth={strokeWidth}
             strokeDasharray={`${arcLength} ${circumference}`}
             strokeLinecap="round"
@@ -77,7 +77,7 @@ export function ScoreGauge({ score, size = 200, label = 'Overall Score', showLab
           >
             {Math.round(animated)}
           </Typography>
-          <Typography variant="caption" sx={{ color: 'hsl(215,20%,50%)', fontSize: 12 }}>
+          <Typography variant="caption" sx={{ color: 'hsl(0,0%,45%)', fontSize: 15 }}>
             out of 100
           </Typography>
         </Box>
@@ -88,7 +88,7 @@ export function ScoreGauge({ score, size = 200, label = 'Overall Score', showLab
           <Typography variant="subtitle1" fontWeight={700} sx={{ color, fontFamily: '"Sora", sans-serif' }}>
             {scoreLabel(score)}
           </Typography>
-          <Typography variant="caption" sx={{ color: 'hsl(215,20%,55%)' }}>
+          <Typography variant="caption" sx={{ color: 'hsl(0,0%,40%)' }}>
             {label}
           </Typography>
         </Box>

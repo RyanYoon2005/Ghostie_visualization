@@ -56,34 +56,18 @@ export const inputsCustomizations = {
               variant: 'contained',
             },
             style: {
-              color: 'white',
-              backgroundColor: gray[900],
-              backgroundImage: `linear-gradient(to bottom, ${gray[700]}, ${gray[800]})`,
-              boxShadow: `inset 0 1px 0 ${gray[600]}, inset 0 -1px 0 1px hsl(220, 0%, 0%)`,
-              border: `1px solid ${gray[700]}`,
+              color: 'hsl(40,30%,96%)',
+              backgroundColor: 'hsl(15,45%,42%)',
+              backgroundImage: 'linear-gradient(to bottom, hsl(15,45%,48%), hsl(15,45%,40%))',
+              border: '1px solid hsl(15,45%,38%)',
+              boxShadow: 'none',
               '&:hover': {
                 backgroundImage: 'none',
-                backgroundColor: gray[700],
-                boxShadow: 'none',
+                backgroundColor: 'hsl(15,45%,38%)',
               },
               '&:active': {
-                backgroundColor: gray[800],
+                backgroundColor: 'hsl(15,45%,36%)',
               },
-              ...theme.applyStyles('dark', {
-                color: 'black',
-                backgroundColor: gray[50],
-                backgroundImage: `linear-gradient(to bottom, ${gray[100]}, ${gray[50]})`,
-                boxShadow: 'inset 0 -1px 0  hsl(220, 30%, 80%)',
-                border: `1px solid ${gray[50]}`,
-                '&:hover': {
-                  backgroundImage: 'none',
-                  backgroundColor: gray[300],
-                  boxShadow: 'none',
-                },
-                '&:active': {
-                  backgroundColor: gray[400],
-                },
-              }),
             },
           },
           {
@@ -92,17 +76,16 @@ export const inputsCustomizations = {
               variant: 'contained',
             },
             style: {
-              color: 'white',
-              backgroundColor: brand[300],
-              backgroundImage: `linear-gradient(to bottom, ${alpha(brand[400], 0.8)}, ${brand[500]})`,
-              boxShadow: `inset 0 2px 0 ${alpha(brand[200], 0.2)}, inset 0 -2px 0 ${alpha(brand[700], 0.4)}`,
-              border: `1px solid ${brand[500]}`,
+              color: 'hsl(40,30%,96%)',
+              backgroundColor: 'hsl(35,45%,42%)',
+              backgroundImage: 'linear-gradient(to bottom, hsl(35,45%,48%), hsl(35,45%,40%))',
+              border: '1px solid hsl(35,45%,38%)',
               '&:hover': {
-                backgroundColor: brand[700],
+                backgroundColor: 'hsl(35,45%,38%)',
                 boxShadow: 'none',
               },
               '&:active': {
-                backgroundColor: brand[700],
+                backgroundColor: 'hsl(35,45%,36%)',
                 backgroundImage: 'none',
               },
             },
@@ -112,28 +95,17 @@ export const inputsCustomizations = {
               variant: 'outlined',
             },
             style: {
-              color: (theme.vars || theme).palette.text.primary,
+              color: 'hsl(0,0%,15%)',
               border: '1px solid',
-              borderColor: gray[200],
-              backgroundColor: alpha(gray[50], 0.3),
+              borderColor: 'hsl(35,20%,68%)',
+              backgroundColor: 'hsl(40,35%,94%)',
               '&:hover': {
-                backgroundColor: gray[100],
-                borderColor: gray[300],
+                backgroundColor: 'hsl(40,35%,88%)',
+                borderColor: 'hsl(35,20%,55%)',
               },
               '&:active': {
-                backgroundColor: gray[200],
+                backgroundColor: 'hsl(40,30%,82%)',
               },
-              ...theme.applyStyles('dark', {
-                backgroundColor: gray[800],
-                borderColor: gray[700],
-                '&:hover': {
-                  backgroundColor: gray[900],
-                  borderColor: gray[600],
-                },
-                '&:active': {
-                  backgroundColor: gray[900],
-                },
-              }),
             },
           },
           {
@@ -227,28 +199,16 @@ export const inputsCustomizations = {
         textTransform: 'none',
         fontWeight: theme.typography.fontWeightMedium,
         letterSpacing: 0,
-        color: (theme.vars || theme).palette.text.primary,
-        border: '1px solid ',
-        borderColor: gray[200],
-        backgroundColor: alpha(gray[50], 0.3),
+        color: 'hsl(0,0%,15%)',
+        border: '1px solid hsl(35,20%,68%)',
+        backgroundColor: 'hsl(40,35%,94%)',
         '&:hover': {
-          backgroundColor: gray[100],
-          borderColor: gray[300],
+          backgroundColor: 'hsl(40,35%,88%)',
+          borderColor: 'hsl(35,20%,55%)',
         },
         '&:active': {
-          backgroundColor: gray[200],
+          backgroundColor: 'hsl(40,30%,82%)',
         },
-        ...theme.applyStyles('dark', {
-          backgroundColor: gray[800],
-          borderColor: gray[700],
-          '&:hover': {
-            backgroundColor: gray[900],
-            borderColor: gray[600],
-          },
-          '&:active': {
-            backgroundColor: gray[900],
-          },
-        }),
         variants: [
           {
             props: {
@@ -276,36 +236,51 @@ export const inputsCustomizations = {
   },
   MuiToggleButtonGroup: {
     styleOverrides: {
-      root: ({ theme }) => ({
+      root: {
         borderRadius: '10px',
-        boxShadow: `0 4px 16px ${alpha(gray[400], 0.2)}`,
-        [`& .${toggleButtonGroupClasses.selected}`]: {
-          color: brand[500],
-        },
-        ...theme.applyStyles('dark', {
-          [`& .${toggleButtonGroupClasses.selected}`]: {
-            color: '#fff',
-          },
-          boxShadow: `0 4px 16px ${alpha(brand[700], 0.5)}`,
-        }),
-      }),
+        boxShadow: 'none',
+      },
     },
   },
   MuiToggleButton: {
     styleOverrides: {
-      root: ({ theme }) => ({
+      root: {
         padding: '12px 16px',
         textTransform: 'none',
         borderRadius: '10px',
         fontWeight: 500,
-        ...theme.applyStyles('dark', {
-          color: gray[400],
-          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.5)',
-          [`&.${toggleButtonClasses.selected}`]: {
-            color: brand[300],
+        boxShadow: 'none',
+      },
+    },
+  },
+  MuiSwitch: {
+    styleOverrides: {
+      thumb: {
+        boxShadow: 'none',
+        // Off-state thumb: warm grey with a faint border so it reads as "off", not as a stray dot.
+        backgroundColor: 'hsl(35,15%,75%)',
+        border: '1px solid hsl(35,15%,55%)',
+      },
+      track: {
+        // Off-state track: deeper than the page so the switch shape is obvious.
+        backgroundColor: 'hsl(35,15%,68%) !important',
+        opacity: '1 !important',
+        border: '1px solid hsl(35,15%,55%)',
+      },
+      switchBase: {
+        '&.Mui-checked': {
+          '& + .MuiSwitch-track': {
+            // On-state track: muted sage to match boutique primary.
+            backgroundColor: 'hsl(95,30%,42%) !important',
+            borderColor: 'hsl(95,30%,32%)',
+            opacity: '1 !important',
           },
-        }),
-      }),
+          '& .MuiSwitch-thumb': {
+            backgroundColor: 'hsl(40,40%,96%)',
+            borderColor: 'hsl(95,30%,32%)',
+          },
+        },
+      },
     },
   },
   MuiCheckbox: {
@@ -437,6 +412,25 @@ export const inputsCustomizations = {
       root: ({ theme }) => ({
         typography: theme.typography.caption,
         marginBottom: 8,
+      }),
+    },
+  },
+  // The theme replaces MUI's notched outline with a plain border on the input root,
+  // which leaves the floating label sitting on top of the border line. Paint the
+  // shrunk label with the input's own background colour + side padding so it visually
+  // "cuts through" the border just like a native notched outline would.
+  MuiInputLabel: {
+    styleOverrides: {
+      root: ({ theme }) => ({
+        [`&.MuiInputLabel-outlined`]: {
+          [`&.MuiInputLabel-shrink`]: {
+            backgroundColor: (theme.vars || theme).palette.background.default,
+            paddingLeft: 6,
+            paddingRight: 6,
+            transform: 'translate(10px, -9px) scale(0.75)',
+            borderRadius: 4,
+          },
+        },
       }),
     },
   },

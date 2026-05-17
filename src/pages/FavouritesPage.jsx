@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -24,8 +24,8 @@ async function computeKey(name, location, category) {
 
 const GLASS = {
   borderRadius: '12px',
-  border: '1px solid hsl(230,25%,25%)',
-  bgcolor: 'hsl(228,38%,16%)',
+  border: '1px solid hsl(35,20%,78%)',
+  bgcolor: 'hsl(40,35%,96%)',
   overflow: 'hidden',
 };
 
@@ -89,11 +89,11 @@ export default function FavouritesPage() {
   return (
     <Box>
       <Box sx={{ mb: 3, ...fadeUp(0) }}>
-        <Typography variant="h4" fontWeight={700} sx={{ fontFamily: '"Sora", sans-serif', color: 'hsl(210,40%,93%)' }}>
+        <Typography variant="h4" fontWeight={700} sx={{ fontFamily: '"Sora", sans-serif', color: 'hsl(0,0%,12%)' }}>
           Favourites
         </Typography>
-        <Typography variant="body2" sx={{ color: 'hsl(215,20%,60%)', mt: 0.5 }}>
-          Your starred businesses. Click a row to run sentiment analysis.
+        <Typography variant="body2" sx={{ color: 'hsl(0,0%,35%)', mt: 0.5 }}>
+          Your starred businesses. Click a row to run a Standard Analysis.
         </Typography>
       </Box>
 
@@ -102,13 +102,13 @@ export default function FavouritesPage() {
       <Box sx={{ ...GLASS, ...fadeUp(0.08) }}>
         {/* Header */}
         <Box sx={{
-          display: 'grid', gridTemplateColumns: '36px 1fr 110px 90px 44px',
+          display: 'grid', gridTemplateColumns: '36px 1fr 140px 110px 44px',
           gap: 2, px: 2.5, py: 1.5,
-          borderBottom: '1px solid hsl(230,25%,25%)',
-          bgcolor: 'rgba(255,255,255,0.03)',
+          borderBottom: '1px solid hsl(35,20%,78%)',
+          bgcolor: 'rgba(0,0,0,0.035)',
         }}>
           {['', 'Company', 'Location', 'Score', ''].map((h, i) => (
-            <Typography key={i} variant="caption" sx={{ textTransform: 'uppercase', letterSpacing: 1, color: 'hsl(215,20%,60%)', fontWeight: 600 }}>
+            <Typography key={i} variant="caption" sx={{ textTransform: 'uppercase', letterSpacing: 1, color: 'hsl(0,0%,35%)', fontWeight: 600 }}>
               {h}
             </Typography>
           ))}
@@ -117,18 +117,18 @@ export default function FavouritesPage() {
         {/* Skeleton rows */}
         {loading && [1, 2, 3].map((i) => (
           <Box key={i} sx={{
-            display: 'grid', gridTemplateColumns: '36px 1fr 110px 90px 44px',
+            display: 'grid', gridTemplateColumns: '36px 1fr 140px 110px 44px',
             gap: 2, px: 2.5, py: 2, alignItems: 'center',
-            borderBottom: '1px solid hsl(230,25%,25%)', '&:last-child': { borderBottom: 0 },
+            borderBottom: '1px solid hsl(35,20%,78%)', '&:last-child': { borderBottom: 0 },
           }}>
-            <Skeleton variant="rounded" width={36} height={36} sx={{ bgcolor: 'rgba(255,255,255,0.06)', borderRadius: '8px' }} />
+            <Skeleton variant="rounded" width={36} height={36} sx={{ bgcolor: 'rgba(0,0,0,0.06)', borderRadius: '8px' }} />
             <Box>
-              <Skeleton variant="text" width="55%" sx={{ bgcolor: 'rgba(255,255,255,0.06)' }} />
-              <Skeleton variant="text" width="35%" sx={{ bgcolor: 'rgba(255,255,255,0.04)' }} />
+              <Skeleton variant="text" width="55%" sx={{ bgcolor: 'rgba(0,0,0,0.06)' }} />
+              <Skeleton variant="text" width="35%" sx={{ bgcolor: 'rgba(0,0,0,0.04)' }} />
             </Box>
-            <Skeleton variant="text" width="70%" sx={{ bgcolor: 'rgba(255,255,255,0.04)' }} />
-            <Skeleton variant="rounded" width={60} height={24} sx={{ bgcolor: 'rgba(255,255,255,0.06)', borderRadius: '6px' }} />
-            <Skeleton variant="circular" width={28} height={28} sx={{ bgcolor: 'rgba(255,255,255,0.04)' }} />
+            <Skeleton variant="text" width="70%" sx={{ bgcolor: 'rgba(0,0,0,0.04)' }} />
+            <Skeleton variant="rounded" width={60} height={24} sx={{ bgcolor: 'rgba(0,0,0,0.06)', borderRadius: '6px' }} />
+            <Skeleton variant="circular" width={28} height={28} sx={{ bgcolor: 'rgba(0,0,0,0.04)' }} />
           </Box>
         ))}
 
@@ -137,7 +137,7 @@ export default function FavouritesPage() {
           <EmptyState
             icon={StarIcon}
             title="No favourites yet"
-            message="Star a business on the Leaderboard or after a Sentiment Analysis."
+            message="Star a business on the Leaderboard or after a Standard Analysis."
           />
         )}
 
@@ -147,45 +147,45 @@ export default function FavouritesPage() {
             key={c.computedKey}
             onClick={() => handleRowClick(c)}
             sx={{
-              display: 'grid', gridTemplateColumns: '36px 1fr 110px 90px 44px',
+              display: 'grid', gridTemplateColumns: '36px 1fr 140px 110px 44px',
               gap: 2, px: 2.5, py: 2, alignItems: 'center',
-              borderBottom: '1px solid hsl(230,25%,25%)',
+              borderBottom: '1px solid hsl(35,20%,78%)',
               '&:last-child': { borderBottom: 0 },
-              '&:hover': { bgcolor: 'rgba(255,255,255,0.04)', cursor: 'pointer' },
+              '&:hover': { bgcolor: 'rgba(0,0,0,0.04)', cursor: 'pointer' },
               transition: 'background 0.15s',
             }}
           >
             <Box sx={{
               width: 36, height: 36, borderRadius: '8px',
-              bgcolor: 'rgba(46,200,110,0.1)', border: '1px solid rgba(46,200,110,0.25)',
+              bgcolor: 'rgba(120,135,90,0.12)', border: '1px solid rgba(120,135,90,0.25)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              <BusinessIcon sx={{ fontSize: 18, color: 'hsl(142,69%,58%)' }} />
+              <BusinessIcon sx={{ fontSize: 18, color: 'hsl(95,25%,42%)' }} />
             </Box>
 
             <Box>
-              <Typography variant="body2" fontWeight={600} sx={{ color: 'hsl(210,40%,93%)' }}>
+              <Typography variant="body2" fontWeight={600} sx={{ color: 'hsl(0,0%,12%)' }}>
                 {c.business_name}
               </Typography>
-              <Typography variant="caption" sx={{ color: 'hsl(215,20%,60%)' }}>
+              <Typography variant="caption" sx={{ color: 'hsl(0,0%,35%)' }}>
                 {c.category}
               </Typography>
             </Box>
 
-            <Typography variant="body2" sx={{ color: 'hsl(215,20%,60%)' }}>
+            <Typography variant="body2" sx={{ color: 'hsl(0,0%,35%)' }}>
               {c.location}
             </Typography>
 
             {c.overall_score != null
               ? <SentimentBadge score={c.overall_score} size="md" />
-              : <Typography variant="body2" sx={{ color: 'hsl(215,20%,60%)' }}>—</Typography>
+              : <Typography variant="body2" sx={{ color: 'hsl(0,0%,35%)' }}>—</Typography>
             }
 
             <Tooltip title="Remove favourite">
               <IconButton
                 size="small"
                 onClick={(e) => { e.stopPropagation(); handleRemove(c); }}
-                sx={{ color: 'hsl(45,93%,58%)' }}
+                sx={{ color: 'hsl(38,55%,48%)' }}
               >
                 <StarIcon fontSize="small" />
               </IconButton>

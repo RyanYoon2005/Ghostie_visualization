@@ -1,4 +1,4 @@
-import { createTheme, alpha } from '@mui/material/styles';
+﻿import { createTheme, alpha } from '@mui/material/styles';
 
 const defaultTheme = createTheme();
 
@@ -217,23 +217,23 @@ export const getDesignTokens = (mode) => {
 
 // Aurora color palette (matches sentiment-sunshine-view template)
 export const aurora = {
-  green:  'hsl(142, 69%, 58%)',
-  purple: 'hsl(262, 83%, 74%)',
-  navy:   'hsl(234, 40%, 14%)',
-  deep:   'hsl(228, 38%, 12%)',
-  card:   'hsl(228, 38%, 16%)',
-  sidebar: 'hsl(234, 45%, 10%)',
-  muted:   'hsl(230, 30%, 22%)',
-  border:  'hsl(230, 25%, 25%)',
-  foreground: 'hsl(210, 40%, 93%)',
-  mutedFg: 'hsl(215, 20%, 60%)',
+  green:  'hsl(95, 25%, 42%)',
+  purple: 'hsl(35, 50%, 50%)',
+  navy:   'hsl(40, 30%, 92%)',
+  deep:   'hsl(40, 30%, 90%)',
+  card:   'hsl(40, 35%, 96%)',
+  sidebar: 'hsl(40, 25%, 86%)',
+  muted:   'hsl(35, 20%, 75%)',
+  border:  'hsl(35, 20%, 78%)',
+  foreground: 'hsl(0, 0%, 12%)',
+  mutedFg: 'hsl(0, 0%, 35%)',
 };
 
 export const colorSchemes = {
   light: {
     palette: {
-      primary: { main: aurora.green, light: 'hsl(142,69%,72%)', dark: 'hsl(142,69%,40%)', contrastText: 'hsl(234,40%,10%)' },
-      secondary: { main: aurora.purple, contrastText: 'hsl(234,40%,10%)' },
+      primary: { main: aurora.green, light: 'hsl(95,25%,55%)', dark: 'hsl(95,25%,32%)', contrastText: 'hsl(0,0%,12%)' },
+      secondary: { main: aurora.purple, contrastText: 'hsl(0,0%,12%)' },
       warning: { light: orange[300], main: orange[400], dark: orange[800] },
       error:   { light: red[300],    main: red[400],    dark: red[800] },
       success: { light: green[300],  main: green[400],  dark: green[800] },
@@ -246,16 +246,16 @@ export const colorSchemes = {
   },
   dark: {
     palette: {
-      primary:   { main: aurora.green,  light: 'hsl(142,69%,72%)', dark: 'hsl(142,69%,40%)', contrastText: 'hsl(234,40%,10%)' },
-      secondary: { main: aurora.purple, light: 'hsl(262,83%,84%)', dark: 'hsl(262,83%,54%)', contrastText: 'hsl(234,40%,10%)' },
-      warning:   { light: 'hsl(45,93%,68%)', main: 'hsl(45,93%,58%)', dark: 'hsl(45,93%,38%)' },
-      error:     { light: red[400],    main: 'hsl(0,84%,60%)',    dark: red[700] },
-      success:   { light: 'hsl(142,69%,70%)', main: aurora.green, dark: 'hsl(142,69%,38%)' },
+      primary:   { main: aurora.green,  light: 'hsl(95,25%,55%)', dark: 'hsl(95,25%,32%)', contrastText: 'hsl(0,0%,12%)' },
+      secondary: { main: aurora.purple, light: 'hsl(35,50%,60%)', dark: 'hsl(35,50%,40%)', contrastText: 'hsl(0,0%,12%)' },
+      warning:   { light: 'hsl(38,55%,56%)', main: 'hsl(38,55%,48%)', dark: 'hsl(38,55%,32%)' },
+      error:     { light: red[400],    main: 'hsl(10,50%,45%)',    dark: red[700] },
+      success:   { light: 'hsl(95,25%,55%)', main: aurora.green, dark: 'hsl(95,25%,30%)' },
       grey: { ...gray },
       divider: aurora.border,
       background: { default: aurora.navy, paper: aurora.card },
       text: { primary: aurora.foreground, secondary: aurora.mutedFg },
-      action: { hover: 'rgba(255,255,255,0.05)', selected: 'rgba(255,255,255,0.1)' },
+      action: { hover: 'rgba(0,0,0,0.05)', selected: 'rgba(0,0,0,0.08)' },
       baseShadow: 'hsla(234, 40%, 5%, 0.7) 0px 4px 24px 0px, hsla(234, 40%, 5%, 0.5) 0px 8px 16px -5px',
     },
   },
@@ -264,49 +264,49 @@ export const colorSchemes = {
 export const typography = {
   fontFamily: 'Inter, sans-serif',
   h1: {
-    fontSize: defaultTheme.typography.pxToRem(48),
+    fontSize: defaultTheme.typography.pxToRem(60),
     fontWeight: 600,
     lineHeight: 1.2,
     letterSpacing: -0.5,
   },
   h2: {
-    fontSize: defaultTheme.typography.pxToRem(36),
+    fontSize: defaultTheme.typography.pxToRem(46),
     fontWeight: 600,
     lineHeight: 1.2,
   },
   h3: {
-    fontSize: defaultTheme.typography.pxToRem(30),
+    fontSize: defaultTheme.typography.pxToRem(38),
     lineHeight: 1.2,
   },
   h4: {
-    fontSize: defaultTheme.typography.pxToRem(24),
+    fontSize: defaultTheme.typography.pxToRem(30),
     fontWeight: 600,
-    lineHeight: 1.5,
+    lineHeight: 1.4,
   },
   h5: {
-    fontSize: defaultTheme.typography.pxToRem(20),
+    fontSize: defaultTheme.typography.pxToRem(25),
     fontWeight: 600,
   },
   h6: {
-    fontSize: defaultTheme.typography.pxToRem(18),
+    fontSize: defaultTheme.typography.pxToRem(22),
     fontWeight: 600,
   },
   subtitle1: {
-    fontSize: defaultTheme.typography.pxToRem(18),
+    fontSize: defaultTheme.typography.pxToRem(22),
   },
   subtitle2: {
-    fontSize: defaultTheme.typography.pxToRem(14),
+    fontSize: defaultTheme.typography.pxToRem(17),
     fontWeight: 500,
   },
   body1: {
-    fontSize: defaultTheme.typography.pxToRem(14),
+    fontSize: defaultTheme.typography.pxToRem(17),
   },
   body2: {
-    fontSize: defaultTheme.typography.pxToRem(14),
+    fontSize: defaultTheme.typography.pxToRem(16),
     fontWeight: 400,
   },
   caption: {
-    fontSize: defaultTheme.typography.pxToRem(12),
+    fontSize: defaultTheme.typography.pxToRem(14),
     fontWeight: 400,
   },
 };

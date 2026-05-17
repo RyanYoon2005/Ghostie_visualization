@@ -1,12 +1,12 @@
-import { useState, useEffect, useRef } from 'react';
+﻿import { useState, useEffect, useRef } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 
 const glowSx = {
-  green:  { boxShadow: '0 0 20px hsl(142 69% 58% / 0.15), 0 0 60px hsl(142 69% 58% / 0.05)' },
-  purple: { boxShadow: '0 0 20px hsl(262 83% 74% / 0.15), 0 0 60px hsl(262 83% 74% / 0.05)' },
+  green:  { boxShadow: '0 0 20px hsl(95 25% 42% / 0.14), 0 0 60px hsl(95 25% 42% / 0.05)' },
+  purple: { boxShadow: '0 0 20px hsl(35 50% 50% / 0.14), 0 0 60px hsl(35 50% 50% / 0.05)' },
 };
 
 function useCountUp(target, duration = 700) {
@@ -40,8 +40,8 @@ export function StatsCard({ label, value, icon: Icon, trend, glow }) {
     <Box sx={{
       p: 2.5,
       borderRadius: '12px',
-      border: '1px solid hsl(230,25%,25%)',
-      bgcolor: 'hsl(228,38%,16%)',
+      border: '1px solid hsl(35,20%,78%)',
+      bgcolor: 'hsl(40,35%,96%)',
       backdropFilter: 'blur(16px)',
       transition: 'box-shadow 0.3s',
       ...(glow ? glowSx[glow] : {}),
@@ -50,22 +50,22 @@ export function StatsCard({ label, value, icon: Icon, trend, glow }) {
         <Box>
           <Typography variant="caption" sx={{
             textTransform: 'uppercase', letterSpacing: 1.2,
-            color: 'hsl(215,20%,60%)', display: 'block', mb: 0.5, fontSize: 12, fontWeight: 600,
+            color: 'hsl(0,0%,35%)', display: 'block', mb: 0.5, fontSize: 15, fontWeight: 600,
           }}>
             {label}
           </Typography>
-          <Typography variant="h4" fontWeight={700} sx={{ color: 'hsl(210,40%,93%)', fontFamily: '"Sora", sans-serif' }}>
+          <Typography variant="h4" fontWeight={700} sx={{ color: 'hsl(0,0%,12%)', fontFamily: '"Sora", sans-serif' }}>
             {animated}
           </Typography>
           {trend && (
             <Box sx={{
               display: 'flex', alignItems: 'center', gap: 0.5, mt: 1,
-              color: trend.positive ? 'hsl(142,69%,58%)' : 'hsl(0,84%,60%)',
+              color: trend.positive ? 'hsl(95,25%,42%)' : 'hsl(10,50%,45%)',
             }}>
               {trend.positive
-                ? <TrendingUpIcon sx={{ fontSize: 13 }} />
-                : <TrendingDownIcon sx={{ fontSize: 13 }} />}
-              <Typography variant="caption" fontWeight={600} sx={{ fontSize: 11 }}>
+                ? <TrendingUpIcon sx={{ fontSize: 16 }} />
+                : <TrendingDownIcon sx={{ fontSize: 16 }} />}
+              <Typography variant="caption" fontWeight={600} sx={{ fontSize: 14 }}>
                 {trend.positive ? '+' : ''}{trend.value}%
               </Typography>
             </Box>
@@ -74,10 +74,10 @@ export function StatsCard({ label, value, icon: Icon, trend, glow }) {
         {Icon && (
           <Box sx={{
             width: 40, height: 40, borderRadius: 2,
-            bgcolor: 'rgba(255,255,255,0.05)',
+            bgcolor: 'rgba(0,0,0,0.05)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <Icon sx={{ fontSize: 20, color: 'hsl(215,20%,60%)' }} />
+            <Icon sx={{ fontSize: 20, color: 'hsl(0,0%,35%)' }} />
           </Box>
         )}
       </Box>

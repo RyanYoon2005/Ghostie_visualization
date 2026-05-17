@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -15,12 +15,17 @@ import LocationOnIcon from '@mui/icons-material/LocationOn';
 import CategoryIcon from '@mui/icons-material/Category';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
 import DownloadIcon from '@mui/icons-material/Download';
+import FormatQuoteIcon from '@mui/icons-material/FormatQuote';
+import InfoIcon from '@mui/icons-material/Info';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import {
   AreaChart, Area, ResponsiveContainer, Tooltip as ReTooltip, XAxis,
 } from 'recharts';
 import { ScoreGauge } from '../components/ScoreGauge';
 import { SentimentBadge } from '../components/SentimentBadge';
 import { API } from '../api/config';
+import { readSnapshotFromHash, clearSnapshotHash, formatSnapshotDate } from '../utils/snapshot';
 
 // Calls without auth — requires backend to allow public read on sentiment/history
 function publicFetch(path) {
@@ -41,15 +46,16 @@ function publicFetch(path) {
 }
 
 const scoreColor = (s) => {
-  if (s >= 57.5) return 'hsl(142,69%,58%)';
-  if (s >= 42.5) return 'hsl(45,93%,58%)';
-  return 'hsl(0,84%,60%)';
+  if (s >= 57.5) return 'hsl(95,25%,42%)';
+  if (s >= 42.5) return 'hsl(38,55%,48%)';
+  return 'hsl(10,50%,45%)';
 };
 
 const sourceLabel = (s) => {
   if (s === 'google_maps_reviews') return 'Review';
   if (s === 'newsapi') return 'News';
   if (s === 'reddit') return 'Reddit';
+  if (s === 'google_news_rss') return 'Google News';
   return s || '—';
 };
 
@@ -70,11 +76,21 @@ export default function ScoreCardPage() {
   const category = searchParams.get('category') || '';
   const decodedName = decodeURIComponent(name);
 
-  const [sentiment, setSentiment] = useState(null);
-  const [history, setHistory]     = useState([]);
-  const [loading, setLoading]     = useState(true);
+  // Read any embedded snapshot on first render — if present we skip the fetch entirely.
+  const initialSnapshot = useState(() => readSnapshotFromHash())[0];
+
+  const [sentiment, setSentiment] = useState(initialSnapshot?.sentiment ?? null);
+  const [history, setHistory]     = useState(() => {
+    if (!initialSnapshot?.sentiment) return [];
+    // We don't store the history array in the snapshot — but the breakdown drives
+    // most of the page, so leave history empty in snapshot mode (sparkline hides).
+    return [];
+  });
+  const [loading, setLoading]     = useState(!initialSnapshot);
   const [error, setError]         = useState('');
   const [copied, setCopied]       = useState(false);
+  const [snapshotDate, setSnapshotDate] = useState(initialSnapshot?.snapshotDate ?? null);
+  const isSnapshot = !!snapshotDate;
 
   useEffect(() => {
     // Update page title + Open Graph tags for social sharing
@@ -91,8 +107,10 @@ export default function ScoreCardPage() {
   }, [decodedName]);
 
   useEffect(() => {
-    const params = new URLSearchParams({ business_name: decodedName, location, category });
+    // Snapshot was loaded synchronously above — skip the network entirely.
+    if (initialSnapshot) return;
 
+    const params = new URLSearchParams({ business_name: decodedName, location, category });
     Promise.all([
       publicFetch(`/analytical-model/sentiment?${params}`).then((r) => r.json()),
       publicFetch(`/analytical-model/history?${params}`).then((r) => r.json()).catch(() => ({})),
@@ -111,7 +129,16 @@ export default function ScoreCardPage() {
       setError(err.message || 'Could not load scorecard.');
       setLoading(false);
     });
-  }, [decodedName, location, category]);
+  }, [decodedName, location, category, initialSnapshot]);
+
+  // "View live data" — strip the snapshot from the URL and refetch.
+  const handleViewLive = () => {
+    clearSnapshotHash();
+    setSnapshotDate(null);
+    setSentiment(null);
+    setHistory([]);
+    setLoading(true);
+  };
 
   const handleShare = async () => {
     await navigator.clipboard.writeText(window.location.href);
@@ -124,7 +151,7 @@ export default function ScoreCardPage() {
     const { default: jsPDF } = await import('jspdf');
     const el = document.getElementById('ghostie-scorecard');
     if (!el) return;
-    const dataUrl = await toPng(el, { pixelRatio: 2, backgroundColor: 'hsl(234,40%,10%)' });
+    const dataUrl = await toPng(el, { pixelRatio: 2, backgroundColor: 'hsl(40,30%,88%)' });
     const img = new Image();
     img.src = dataUrl;
     await new Promise((res) => { img.onload = res; });
@@ -136,12 +163,12 @@ export default function ScoreCardPage() {
   };
 
   const score = sentiment?.overall_score ?? null;
-  const color = score !== null ? scoreColor(score) : 'hsl(215,20%,60%)';
+  const color = score !== null ? scoreColor(score) : 'hsl(0,0%,35%)';
 
   return (
     <Box sx={{
       minHeight: '100vh',
-      bgcolor: 'hsl(234,40%,10%)',
+      bgcolor: 'hsl(40,30%,88%)',
       display: 'flex',
       flexDirection: 'column',
     }}>
@@ -156,52 +183,85 @@ export default function ScoreCardPage() {
       <Box className="ghostie-no-print" sx={{
         px: { xs: 2, md: 4 }, py: 2,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        borderBottom: '1px solid hsl(230,25%,20%)',
-        bgcolor: 'hsl(228,38%,14%)',
+        borderBottom: '1px solid hsl(35,20%,72%)',
+        bgcolor: 'hsl(40,30%,94%)',
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <Box sx={{
             width: 32, height: 32, borderRadius: 2,
-            background: 'linear-gradient(135deg, hsl(142,69%,58%), hsl(262,83%,74%))',
+            background: 'linear-gradient(135deg, hsl(15,45%,45%), hsl(35,45%,45%))',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <AnalyticsIcon sx={{ fontSize: 16, color: 'hsl(234,40%,10%)' }} />
+            <AnalyticsIcon sx={{ fontSize: 19, color: 'hsl(40,30%,88%)' }} />
           </Box>
-          <Typography fontWeight={700} sx={{ fontFamily: '"Sora", sans-serif', color: 'hsl(210,40%,93%)', fontSize: 15 }}>
+          <Typography fontWeight={700} sx={{ fontFamily: '"Sora", sans-serif', color: 'hsl(0,0%,12%)', fontSize: 18 }}>
             Ghostie
           </Typography>
-          <Typography variant="caption" sx={{ color: 'hsl(215,20%,50%)', display: { xs: 'none', sm: 'block' } }}>
+          <Typography variant="caption" sx={{ color: 'hsl(0,0%,45%)', display: { xs: 'none', sm: 'block' } }}>
             Business Sentiment Intelligence
           </Typography>
         </Box>
         <Button
           size="small"
           variant="outlined"
-          endIcon={<OpenInNewIcon sx={{ fontSize: 14 }} />}
+          endIcon={<OpenInNewIcon sx={{ fontSize: 17 }} />}
           onClick={() => navigate('/signin')}
-          sx={{ fontSize: 12, borderColor: 'hsl(230,25%,30%)', color: 'hsl(215,20%,70%)', '&:hover': { borderColor: 'hsl(142,69%,58%)', color: 'hsl(142,69%,58%)' } }}
+          sx={{ fontSize: 15, borderColor: 'hsl(35,20%,82%)', color: 'hsl(0,0%,25%)', '&:hover': { borderColor: 'hsl(95,25%,42%)', color: 'hsl(95,25%,42%)' } }}
         >
           Sign in to analyse
         </Button>
       </Box>
+
+      {/* Snapshot notice — only when rendering from an embedded snapshot */}
+      {isSnapshot && (
+        <Box className="ghostie-no-print" sx={{
+          maxWidth: 800, mx: 'auto', width: '100%', px: { xs: 2, md: 4 }, mt: 2,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1,
+          color: 'hsl(0,0%,30%)',
+        }}>
+          <Typography variant="caption" sx={{ fontSize: 14 }}>
+            📌 Snapshot from {formatSnapshotDate(snapshotDate)} — the data below was captured at that time.
+          </Typography>
+          <Box
+            component="button"
+            type="button"
+            onClick={handleViewLive}
+            sx={{
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              fontFamily: 'inherit',
+              fontSize: 15,
+              fontWeight: 600,
+              color: 'hsl(15,45%,38%) !important',
+              textDecoration: 'underline',
+              textUnderlineOffset: '3px',
+              cursor: 'pointer',
+              '&:hover': { color: 'hsl(15,45%,28%) !important' },
+            }}
+          >
+            View live data
+          </Box>
+        </Box>
+      )}
 
       {/* Main content */}
       <Box sx={{ flex: 1, maxWidth: 800, mx: 'auto', width: '100%', px: { xs: 2, md: 4 }, py: 4 }}>
 
         {loading && (
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
-            <CircularProgress sx={{ color: 'hsl(142,69%,58%)' }} />
+            <CircularProgress sx={{ color: 'hsl(95,25%,42%)' }} />
           </Box>
         )}
 
         {error && (
           <Box sx={{ mt: 4 }}>
             <Alert severity="error">{error}</Alert>
-            <Typography variant="body2" sx={{ color: 'hsl(215,20%,55%)', mt: 2, textAlign: 'center' }}>
+            <Typography variant="body2" sx={{ color: 'hsl(0,0%,40%)', mt: 2, textAlign: 'center' }}>
               This company may not have been analysed yet.{' '}
               <Box component="span"
                 onClick={() => navigate('/signin')}
-                sx={{ color: 'hsl(142,69%,58%)', cursor: 'pointer', textDecoration: 'underline' }}>
+                sx={{ color: 'hsl(95,25%,42%)', cursor: 'pointer', textDecoration: 'underline' }}>
                 Sign in to run an analysis.
               </Box>
             </Typography>
@@ -216,7 +276,7 @@ export default function ScoreCardPage() {
               ...fadeUp(0),
               borderRadius: '20px',
               border: `1px solid ${color}33`,
-              bgcolor: 'hsl(228,38%,16%)',
+              bgcolor: 'hsl(40,35%,96%)',
               p: { xs: 3, md: 4 },
               mb: 3,
               position: 'relative',
@@ -235,8 +295,8 @@ export default function ScoreCardPage() {
 
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography variant="h3" fontWeight={800} sx={{
-                    fontFamily: '"Sora", sans-serif', color: 'hsl(210,40%,93%)',
-                    lineHeight: 1.1, mb: 1,
+                    fontFamily: '"Sora", sans-serif', color: 'hsl(0,0%,12%)',
+                    lineHeight: 1.2, mb: 1,
                   }}>
                     {sentiment.business_name}
                   </Typography>
@@ -246,33 +306,33 @@ export default function ScoreCardPage() {
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 1.5 }}>
                     {location && (
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                        <LocationOnIcon sx={{ fontSize: 14, color: 'hsl(215,20%,50%)' }} />
-                        <Typography variant="body2" sx={{ color: 'hsl(215,20%,65%)' }}>{location}</Typography>
+                        <LocationOnIcon sx={{ fontSize: 17, color: 'hsl(0,0%,45%)' }} />
+                        <Typography variant="body2" sx={{ color: 'hsl(0,0%,30%)' }}>{location}</Typography>
                       </Box>
                     )}
                     {category && (
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                        <CategoryIcon sx={{ fontSize: 14, color: 'hsl(215,20%,50%)' }} />
-                        <Typography variant="body2" sx={{ color: 'hsl(215,20%,65%)' }}>{category}</Typography>
+                        <CategoryIcon sx={{ fontSize: 17, color: 'hsl(0,0%,45%)' }} />
+                        <Typography variant="body2" sx={{ color: 'hsl(0,0%,30%)' }}>{category}</Typography>
                       </Box>
                     )}
                   </Box>
 
                   <Box sx={{ display: 'flex', gap: 3, mt: 2.5, flexWrap: 'wrap' }}>
                     <Box>
-                      <Typography variant="caption" sx={{ color: 'hsl(215,20%,50%)', textTransform: 'uppercase', letterSpacing: 1, fontSize: 10, display: 'block' }}>Items</Typography>
-                      <Typography variant="h6" fontWeight={700} sx={{ color: 'hsl(210,40%,93%)', fontFamily: '"Sora", sans-serif' }}>
+                      <Typography variant="caption" sx={{ color: 'hsl(0,0%,45%)', textTransform: 'uppercase', letterSpacing: 1, fontSize: 13, display: 'block' }}>Items</Typography>
+                      <Typography variant="h6" fontWeight={700} sx={{ color: 'hsl(0,0%,12%)', fontFamily: '"Sora", sans-serif' }}>
                         {sentiment.items_analysed}
                       </Typography>
                     </Box>
                     <Box>
-                      <Typography variant="caption" sx={{ color: 'hsl(215,20%,50%)', textTransform: 'uppercase', letterSpacing: 1, fontSize: 10, display: 'block' }}>Rating</Typography>
-                      <Typography variant="h6" fontWeight={700} sx={{ color: 'hsl(210,40%,93%)', fontFamily: '"Sora", sans-serif' }}>
+                      <Typography variant="caption" sx={{ color: 'hsl(0,0%,45%)', textTransform: 'uppercase', letterSpacing: 1, fontSize: 13, display: 'block' }}>Rating</Typography>
+                      <Typography variant="h6" fontWeight={700} sx={{ color: 'hsl(0,0%,12%)', fontFamily: '"Sora", sans-serif' }}>
                         {sentiment.overall_rating}/5
                       </Typography>
                     </Box>
                     <Box>
-                      <Typography variant="caption" sx={{ color: 'hsl(215,20%,50%)', textTransform: 'uppercase', letterSpacing: 1, fontSize: 10, display: 'block' }}>Score</Typography>
+                      <Typography variant="caption" sx={{ color: 'hsl(0,0%,45%)', textTransform: 'uppercase', letterSpacing: 1, fontSize: 13, display: 'block' }}>Score</Typography>
                       <Typography variant="h6" fontWeight={700} sx={{ color, fontFamily: '"Sora", sans-serif' }}>
                         {Math.round(score)}/100
                       </Typography>
@@ -286,10 +346,10 @@ export default function ScoreCardPage() {
             {history.length > 1 && (
               <Box sx={{
                 ...fadeUp(0.08),
-                borderRadius: '16px', border: '1px solid hsl(230,25%,25%)',
-                bgcolor: 'hsl(228,38%,16%)', p: 2.5, mb: 3,
+                borderRadius: '16px', border: '1px solid hsl(35,20%,78%)',
+                bgcolor: 'hsl(40,35%,96%)', p: 2.5, mb: 3,
               }}>
-                <Typography variant="caption" sx={{ color: 'hsl(215,20%,55%)', textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, display: 'block', mb: 1.5 }}>
+                <Typography variant="caption" sx={{ color: 'hsl(0,0%,40%)', textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, display: 'block', mb: 1.5 }}>
                   Score Trend
                 </Typography>
                 <ResponsiveContainer width="100%" height={80}>
@@ -302,8 +362,8 @@ export default function ScoreCardPage() {
                     </defs>
                     <XAxis dataKey="date" hide />
                     <ReTooltip
-                      contentStyle={{ backgroundColor: 'hsl(228,38%,20%)', border: '1px solid hsl(230,25%,25%)', borderRadius: 8, fontSize: 12 }}
-                      labelStyle={{ color: 'hsl(210,40%,93%)' }}
+                      contentStyle={{ backgroundColor: 'hsl(40,35%,98%)', border: '1px solid hsl(35,20%,78%)', borderRadius: 8, fontSize: 15 }}
+                      labelStyle={{ color: 'hsl(0,0%,12%)' }}
                     />
                     <Area type="monotone" dataKey="score" stroke={color} strokeWidth={2} fill="url(#sparkGrad)" dot={false} />
                   </AreaChart>
@@ -311,17 +371,94 @@ export default function ScoreCardPage() {
               </Box>
             )}
 
-            {/* Keywords */}
-            {sentiment.keywords?.length > 0 && (
+            {/* Summary — extractive TF-IDF summary */}
+            {sentiment.summary && (
+              <Box sx={{
+                ...fadeUp(0.1),
+                borderRadius: '16px', border: '1px solid hsl(35,20%,78%)',
+                bgcolor: 'hsl(40,35%,96%)', p: 2.5, mb: 3,
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <FormatQuoteIcon sx={{ fontSize: 18, color: 'hsl(35,50%,50%)' }} />
+                  <Typography variant="caption" sx={{ color: 'hsl(0,0%,40%)', textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>
+                    Summary
+                  </Typography>
+                </Box>
+                <Typography variant="body2" sx={{ color: 'hsl(0,0%,18%)', lineHeight: 1.65, fontStyle: 'italic' }}>
+                  {sentiment.summary}
+                </Typography>
+              </Box>
+            )}
+
+            {/* Explanation — what drove the score */}
+            {sentiment.explanation && (
+              <Box sx={{
+                ...fadeUp(0.11),
+                borderRadius: '16px', border: '1px solid hsl(35,20%,78%)',
+                bgcolor: 'hsl(40,35%,96%)', p: 2.5, mb: 3,
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <InfoIcon sx={{ fontSize: 18, color: 'hsl(210,25%,48%)' }} />
+                  <Typography variant="caption" sx={{ color: 'hsl(0,0%,40%)', textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>
+                    What drove this score
+                  </Typography>
+                </Box>
+                <Typography variant="body2" sx={{ color: 'hsl(0,0%,22%)', lineHeight: 1.65 }}>
+                  {sentiment.explanation}
+                </Typography>
+              </Box>
+            )}
+
+            {/* Keywords — split by polarity when available */}
+            {(sentiment.keyword_split?.positive?.length > 0 || sentiment.keyword_split?.negative?.length > 0) ? (
+              <Box sx={{ ...fadeUp(0.12), mb: 3, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                {sentiment.keyword_split.positive?.length > 0 && (
+                  <Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
+                      <TrendingUpIcon sx={{ fontSize: 17, color: 'hsl(95,25%,42%)' }} />
+                      <Typography variant="caption" sx={{ color: 'hsl(95,25%,42%)', textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>
+                        Positive Signals
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                      {sentiment.keyword_split.positive.map((kw) => (
+                        <Chip key={`pos-${kw}`} label={kw} size="small" sx={{
+                          bgcolor: 'rgba(120,135,90,0.14)', border: '1px solid hsl(95,25%,32%)',
+                          color: 'hsl(95,25%,55%)', fontSize: 16, height: 32,
+                        }} />
+                      ))}
+                    </Box>
+                  </Box>
+                )}
+                {sentiment.keyword_split.negative?.length > 0 && (
+                  <Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
+                      <TrendingDownIcon sx={{ fontSize: 17, color: 'hsl(10,50%,45%)' }} />
+                      <Typography variant="caption" sx={{ color: 'hsl(10,50%,45%)', textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>
+                        Negative Signals
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                      {sentiment.keyword_split.negative.map((kw) => (
+                        <Chip key={`neg-${kw}`} label={kw} size="small" sx={{
+                          bgcolor: 'rgba(180,80,60,0.12)', border: '1px solid hsl(10,50%,30%)',
+                          color: 'hsl(10,50%,55%)', fontSize: 16, height: 32,
+                        }} />
+                      ))}
+                    </Box>
+                  </Box>
+                )}
+              </Box>
+            ) : sentiment.keywords?.length > 0 && (
               <Box sx={{ ...fadeUp(0.12), mb: 3 }}>
-                <Typography variant="caption" sx={{ color: 'hsl(215,20%,55%)', textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, display: 'block', mb: 1.5 }}>
+                <Typography variant="caption" sx={{ color: 'hsl(0,0%,40%)', textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, display: 'block', mb: 1.5 }}>
                   Top Keywords
                 </Typography>
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                   {sentiment.keywords.map((kw) => (
                     <Chip key={kw} label={kw} size="small" sx={{
                       bgcolor: `${color}15`, border: `1px solid ${color}35`,
-                      color: 'hsl(210,40%,80%)', fontSize: 13, height: 28,
+                      color: 'hsl(0,0%,20%)', fontSize: 16, height: 32,
                     }} />
                   ))}
                 </Box>
@@ -332,11 +469,11 @@ export default function ScoreCardPage() {
             {sentiment.breakdown?.length > 0 && (
               <Box sx={{
                 ...fadeUp(0.16),
-                borderRadius: '16px', border: '1px solid hsl(230,25%,25%)',
-                bgcolor: 'hsl(228,38%,16%)', overflow: 'hidden', mb: 3,
+                borderRadius: '16px', border: '1px solid hsl(35,20%,78%)',
+                bgcolor: 'hsl(40,35%,96%)', overflow: 'hidden', mb: 3,
               }}>
-                <Box sx={{ px: 2.5, py: 1.75, borderBottom: '1px solid hsl(230,25%,25%)', bgcolor: 'rgba(255,255,255,0.03)' }}>
-                  <Typography variant="caption" sx={{ color: 'hsl(215,20%,55%)', textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>
+                <Box sx={{ px: 2.5, py: 1.75, borderBottom: '1px solid hsl(35,20%,78%)', bgcolor: 'rgba(0,0,0,0.035)' }}>
+                  <Typography variant="caption" sx={{ color: 'hsl(0,0%,40%)', textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>
                     Source Breakdown (top {Math.min(sentiment.breakdown.length, 5)})
                   </Typography>
                 </Box>
@@ -345,22 +482,22 @@ export default function ScoreCardPage() {
                   return (
                     <Box key={i} sx={{
                       px: 2.5, py: 1.75,
-                      borderBottom: i < Math.min(sentiment.breakdown.length, 5) - 1 ? '1px solid hsl(230,25%,22%)' : 'none',
+                      borderBottom: i < Math.min(sentiment.breakdown.length, 5) - 1 ? '1px solid hsl(35,20%,75%)' : 'none',
                     }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.75 }}>
                         <Box sx={{ px: 1, py: 0.2, borderRadius: '4px', bgcolor: `${c}18`, border: `1px solid ${c}40`, flexShrink: 0 }}>
-                          <Typography sx={{ color: c, fontWeight: 700, fontSize: 10, letterSpacing: 0.5 }}>
+                          <Typography sx={{ color: c, fontWeight: 700, fontSize: 13, letterSpacing: 0.5 }}>
                             {sourceLabel(item.source).toUpperCase()}
                           </Typography>
                         </Box>
-                        <Box sx={{ flex: 1, height: 4, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.07)' }}>
+                        <Box sx={{ flex: 1, height: 4, borderRadius: 2, bgcolor: 'rgba(0,0,0,0.07)' }}>
                           <Box sx={{ height: '100%', width: `${item.score}%`, borderRadius: 2, bgcolor: c, transition: 'width 1s ease' }} />
                         </Box>
                         <Typography variant="body2" sx={{ color: c, fontWeight: 700, minWidth: 28, textAlign: 'right' }}>
                           {Math.round(item.score)}
                         </Typography>
                       </Box>
-                      <Typography variant="body2" sx={{ color: 'hsl(215,20%,65%)', lineHeight: 1.5 }}>
+                      <Typography variant="body2" sx={{ color: 'hsl(0,0%,30%)', lineHeight: 1.5 }}>
                         {(item.body || item.text || '').slice(0, 160)}{(item.body || item.text || '').length > 160 ? '…' : ''}
                       </Typography>
                     </Box>
@@ -379,8 +516,8 @@ export default function ScoreCardPage() {
                 startIcon={copied ? <CheckIcon /> : <ShareIcon />}
                 onClick={handleShare}
                 sx={{
-                  borderColor: copied ? 'hsl(142,69%,58%)' : 'hsl(230,25%,30%)',
-                  color: copied ? 'hsl(142,69%,58%)' : 'hsl(215,20%,70%)',
+                  borderColor: copied ? 'hsl(95,25%,42%)' : 'hsl(35,20%,82%)',
+                  color: copied ? 'hsl(95,25%,42%)' : 'hsl(0,0%,25%)',
                   transition: 'all 0.2s',
                 }}
               >
@@ -391,7 +528,7 @@ export default function ScoreCardPage() {
               variant="outlined"
               startIcon={<DownloadIcon />}
               onClick={handleDownload}
-              sx={{ borderColor: 'hsl(230,25%,30%)', color: 'hsl(215,20%,70%)', '&:hover': { borderColor: 'hsl(215,20%,50%)', color: 'hsl(210,40%,93%)' } }}
+              sx={{ borderColor: 'hsl(35,20%,82%)', color: 'hsl(0,0%,25%)', '&:hover': { borderColor: 'hsl(0,0%,45%)', color: 'hsl(0,0%,12%)' } }}
             >
               Download PDF
             </Button>
@@ -400,8 +537,8 @@ export default function ScoreCardPage() {
               endIcon={<AnalyticsIcon />}
               onClick={() => navigate('/signin')}
               sx={{
-                background: 'linear-gradient(135deg, hsl(142,69%,42%), hsl(142,69%,35%))',
-                '&:hover': { background: 'linear-gradient(135deg, hsl(142,69%,48%), hsl(142,69%,40%))' },
+                background: 'linear-gradient(135deg, hsl(15,45%,45%), hsl(15,45%,38%))',
+                '&:hover': { background: 'linear-gradient(135deg, hsl(15,45%,48%), hsl(15,45%,42%))' },
               }}
             >
               Analyse with Ghostie
@@ -412,11 +549,11 @@ export default function ScoreCardPage() {
       </Box>
 
       {/* Footer */}
-      <Divider className="ghostie-no-print" sx={{ borderColor: 'hsl(230,25%,20%)' }} />
+      <Divider className="ghostie-no-print" sx={{ borderColor: 'hsl(35,20%,72%)' }} />
       <Box className="ghostie-no-print" sx={{ px: 4, py: 2, textAlign: 'center' }}>
-        <Typography variant="caption" sx={{ color: 'hsl(215,20%,40%)' }}>
+        <Typography variant="caption" sx={{ color: 'hsl(0,0%,50%)' }}>
           Powered by{' '}
-          <Box component="span" sx={{ color: 'hsl(142,69%,48%)', fontWeight: 600 }}>Ghostie</Box>
+          <Box component="span" sx={{ color: 'hsl(95,25%,40%)', fontWeight: 600 }}>Ghostie</Box>
           {' '}— Public sentiment data. Scores update when new data is collected.
         </Typography>
       </Box>

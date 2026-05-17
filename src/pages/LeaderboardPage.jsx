@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+﻿import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -32,10 +32,10 @@ async function computeKey(name, location, category) {
 }
 
 const rankSx = (rank) => {
-  if (rank === 1) return { bgcolor: 'rgba(250,185,0,0.12)', color: '#fab900', borderColor: 'rgba(250,185,0,0.35)' };
+  if (rank === 1) return { bgcolor: 'rgba(180,140,60,0.12)', color: '#b8860b', borderColor: 'rgba(180,140,60,0.35)' };
   if (rank === 2) return { bgcolor: 'rgba(180,180,180,0.12)', color: '#b4b4b4', borderColor: 'rgba(180,180,180,0.35)' };
-  if (rank === 3) return { bgcolor: 'rgba(180,100,0,0.12)', color: '#b46400', borderColor: 'rgba(180,100,0,0.35)' };
-  return { bgcolor: 'rgba(255,255,255,0.05)', color: 'hsl(215,20%,60%)', borderColor: 'hsl(230,25%,25%)' };
+  if (rank === 3) return { bgcolor: 'rgba(160,82,45,0.14)', color: '#a0522d', borderColor: 'rgba(160,82,45,0.30)' };
+  return { bgcolor: 'rgba(0,0,0,0.05)', color: 'hsl(0,0%,35%)', borderColor: 'hsl(35,20%,78%)' };
 };
 
 const fadeUp = (delay = 0) => ({
@@ -114,10 +114,10 @@ export default function LeaderboardPage() {
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3, ...fadeUp(0) }}>
         <Box>
-          <Typography variant="h4" fontWeight={700} sx={{ fontFamily: '"Sora", sans-serif', color: 'hsl(210,40%,93%)' }}>
+          <Typography variant="h4" fontWeight={700} sx={{ fontFamily: '"Sora", sans-serif', color: 'hsl(0,0%,12%)' }}>
             Leaderboard
           </Typography>
-          <Typography variant="body2" sx={{ color: 'hsl(215,20%,60%)', mt: 0.5 }}>
+          <Typography variant="body2" sx={{ color: 'hsl(0,0%,35%)', mt: 0.5 }}>
             Top businesses ranked by sentiment score
           </Typography>
         </Box>
@@ -127,13 +127,13 @@ export default function LeaderboardPage() {
       </Box>
 
       <Grid container spacing={2} sx={{ mb: 3, ...fadeUp(0.07) }}>
-        <Grid item xs={12} md={4}>
+        <Grid size={{ xs: 12, md: 4 }}>
           <StatsCard label="Avg Sentiment" value={loading ? 0 : avgScore} icon={BarChartIcon} glow="green" />
         </Grid>
-        <Grid item xs={12} md={4}>
+        <Grid size={{ xs: 12, md: 4 }}>
           <StatsCard label="Companies Tracked" value={loading ? 0 : board.length} icon={TrophyIcon} glow="purple" />
         </Grid>
-        <Grid item xs={12} md={4}>
+        <Grid size={{ xs: 12, md: 4 }}>
           <StatsCard label="Favourites" value={loading ? 0 : favCount} icon={StarIcon} />
         </Grid>
       </Grid>
@@ -142,13 +142,13 @@ export default function LeaderboardPage() {
 
       <Box sx={{
         borderRadius: '12px',
-        border: '1px solid hsl(230,25%,25%)',
-        bgcolor: 'hsl(228,38%,16%)',
+        border: '1px solid hsl(35,20%,78%)',
+        bgcolor: 'hsl(40,35%,96%)',
         overflow: 'hidden',
         ...fadeUp(0.14),
       }}>
         {/* Search bar */}
-        <Box sx={{ px: 2.5, py: 1.5, borderBottom: '1px solid hsl(230,25%,25%)' }}>
+        <Box sx={{ px: 2.5, py: 1.5, borderBottom: '1px solid hsl(35,20%,78%)' }}>
           <TextField
             size="small"
             placeholder="Filter by name, location or category…"
@@ -158,24 +158,24 @@ export default function LeaderboardPage() {
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <SearchIcon sx={{ fontSize: 18, color: 'hsl(215,20%,60%)' }} />
+                  <SearchIcon sx={{ fontSize: 18, color: 'hsl(0,0%,35%)' }} />
                 </InputAdornment>
               ),
             }}
-            sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'rgba(255,255,255,0.03)' } }}
+            sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'rgba(0,0,0,0.035)' } }}
           />
         </Box>
 
         {/* Header */}
         <Box sx={{
           display: 'grid',
-          gridTemplateColumns: '60px 1fr 90px 110px 44px',
+          gridTemplateColumns: '80px 1fr 110px 130px 44px',
           gap: 2, px: 2.5, py: 1.5,
-          borderBottom: '1px solid hsl(230,25%,25%)',
-          bgcolor: 'rgba(255,255,255,0.03)',
+          borderBottom: '1px solid hsl(35,20%,78%)',
+          bgcolor: 'rgba(0,0,0,0.035)',
         }}>
           {['Rank', 'Company', 'Score', 'Location', ''].map((h, i) => (
-            <Typography key={i} variant="body2" sx={{ textTransform: 'uppercase', letterSpacing: 0.8, color: 'hsl(215,20%,60%)', fontWeight: 600, fontSize: 12 }}>
+            <Typography key={i} variant="body2" sx={{ textTransform: 'uppercase', letterSpacing: 0.8, color: 'hsl(0,0%,35%)', fontWeight: 600, fontSize: 15 }}>
               {h}
             </Typography>
           ))}
@@ -184,18 +184,18 @@ export default function LeaderboardPage() {
         {/* Skeleton rows */}
         {loading && [1, 2, 3, 4, 5].map((i) => (
           <Box key={i} sx={{
-            display: 'grid', gridTemplateColumns: '60px 1fr 90px 110px 44px',
-            gap: 2, px: 2.5, py: 2, borderBottom: '1px solid hsl(230,25%,25%)',
+            display: 'grid', gridTemplateColumns: '80px 1fr 110px 130px 44px',
+            gap: 2, px: 2.5, py: 2, borderBottom: '1px solid hsl(35,20%,78%)',
             alignItems: 'center', '&:last-child': { borderBottom: 0 },
           }}>
-            <Skeleton variant="circular" width={32} height={32} sx={{ bgcolor: 'rgba(255,255,255,0.06)' }} />
+            <Skeleton variant="circular" width={32} height={32} sx={{ bgcolor: 'rgba(0,0,0,0.06)' }} />
             <Box>
-              <Skeleton variant="text" width="60%" sx={{ bgcolor: 'rgba(255,255,255,0.06)' }} />
-              <Skeleton variant="text" width="40%" sx={{ bgcolor: 'rgba(255,255,255,0.04)' }} />
+              <Skeleton variant="text" width="60%" sx={{ bgcolor: 'rgba(0,0,0,0.06)' }} />
+              <Skeleton variant="text" width="40%" sx={{ bgcolor: 'rgba(0,0,0,0.04)' }} />
             </Box>
-            <Skeleton variant="rounded" width={60} height={24} sx={{ bgcolor: 'rgba(255,255,255,0.06)', borderRadius: '6px' }} />
-            <Skeleton variant="text" width="70%" sx={{ bgcolor: 'rgba(255,255,255,0.04)' }} />
-            <Skeleton variant="circular" width={28} height={28} sx={{ bgcolor: 'rgba(255,255,255,0.04)' }} />
+            <Skeleton variant="rounded" width={60} height={24} sx={{ bgcolor: 'rgba(0,0,0,0.06)', borderRadius: '6px' }} />
+            <Skeleton variant="text" width="70%" sx={{ bgcolor: 'rgba(0,0,0,0.04)' }} />
+            <Skeleton variant="circular" width={28} height={28} sx={{ bgcolor: 'rgba(0,0,0,0.04)' }} />
           </Box>
         ))}
 
@@ -215,31 +215,31 @@ export default function LeaderboardPage() {
               onClick={() => handleRowClick(biz)}
               sx={{
                 display: 'grid',
-                gridTemplateColumns: '60px 1fr 90px 110px 44px',
+                gridTemplateColumns: '80px 1fr 110px 130px 44px',
                 gap: 2, px: 2.5, py: 2,
-                borderBottom: '1px solid hsl(230,25%,25%)',
+                borderBottom: '1px solid hsl(35,20%,78%)',
                 alignItems: 'center',
                 '&:last-child': { borderBottom: 0 },
-                '&:hover': { bgcolor: 'rgba(255,255,255,0.04)', cursor: 'pointer' },
+                '&:hover': { bgcolor: 'rgba(0,0,0,0.04)', cursor: 'pointer' },
                 transition: 'background 0.15s',
               }}
             >
               <Box sx={{
                 width: 32, height: 32, borderRadius: '50%', border: '1px solid',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 12, fontWeight: 700, ...rankSx(globalIndex + 1),
+                fontSize: 15, fontWeight: 700, ...rankSx(globalIndex + 1),
               }}>
                 {globalIndex + 1}
               </Box>
 
               <Box>
-                <Typography variant="body1" fontWeight={600} sx={{ color: 'hsl(210,40%,93%)' }}>{biz.business_name}</Typography>
-                <Typography variant="body2" sx={{ color: 'hsl(215,20%,60%)' }}>{biz.category}</Typography>
+                <Typography variant="body1" fontWeight={600} sx={{ color: 'hsl(0,0%,12%)' }}>{biz.business_name}</Typography>
+                <Typography variant="body2" sx={{ color: 'hsl(0,0%,35%)' }}>{biz.category}</Typography>
               </Box>
 
               <SentimentBadge score={biz.overall_score} size="md" />
 
-              <Typography variant="body2" sx={{ color: 'hsl(215,20%,70%)' }}>{biz.location}</Typography>
+              <Typography variant="body2" sx={{ color: 'hsl(0,0%,25%)' }}>{biz.location}</Typography>
 
               <Tooltip title={isFav ? 'Remove favourite' : 'Add to favourites'}>
                 <span>
@@ -247,7 +247,7 @@ export default function LeaderboardPage() {
                     size="small"
                     disabled={!bizKey}
                     onClick={(e) => handleToggle(e, bizKey, biz.business_name, isFav)}
-                    sx={{ color: isFav ? 'hsl(45,93%,58%)' : 'hsl(215,20%,60%)' }}
+                    sx={{ color: isFav ? 'hsl(38,55%,48%)' : 'hsl(0,0%,35%)' }}
                   >
                     {isFav ? <StarIcon fontSize="small" /> : <StarBorderIcon fontSize="small" />}
                   </IconButton>
