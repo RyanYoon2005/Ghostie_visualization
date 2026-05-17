@@ -24,6 +24,7 @@ import MenuIcon from '@mui/icons-material/Menu';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
 import LeaderboardIcon from '@mui/icons-material/Leaderboard';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
+import BookmarkIcon from '@mui/icons-material/Bookmark';
 import StarIcon from '@mui/icons-material/Star';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import MoreVertRoundedIcon from '@mui/icons-material/MoreVertRounded';
@@ -48,8 +49,9 @@ const navGroups = [
   {
     title: 'Premium features',
     items: [
-      { label: 'Premium Analysis', icon: <CompareArrowsIcon />, path: '/history' },
-      { label: 'Favourites',       icon: <StarIcon />,          path: '/favourites' },
+      { label: 'Premium Analysis',    icon: <CompareArrowsIcon />, path: '/history' },
+      { label: 'Saved Comparisons',   icon: <BookmarkIcon />,      path: '/comparisons' },
+      { label: 'Favourites',          icon: <StarIcon />,          path: '/favourites' },
     ],
   },
 ];
@@ -93,8 +95,7 @@ function OptionsMenu({ onLogout, onAddAccount }) {
           <ListItemText
             primary={user?.username}
             secondary={user?.email}
-            primaryTypographyProps={{ fontSize: 16, fontWeight: 600 }}
-            secondaryTypographyProps={{ fontSize: 14 }}
+            slotProps={{ primary: { fontSize: 16, fontWeight: 600 }, secondary: { fontSize: 14 } }}
           />
           <ListItemIcon sx={{ ml: 1, minWidth: 0 }}>
             <CheckRoundedIcon fontSize="small" color="primary" />
@@ -111,8 +112,7 @@ function OptionsMenu({ onLogout, onAddAccount }) {
             <ListItemText
               primary={a.user.username}
               secondary={a.user.email}
-              primaryTypographyProps={{ fontSize: 16 }}
-              secondaryTypographyProps={{ fontSize: 14 }}
+              slotProps={{ primary: { fontSize: 16 }, secondary: { fontSize: 14 } }}
             />
           </MenuItem>
         ))}
@@ -122,7 +122,7 @@ function OptionsMenu({ onLogout, onAddAccount }) {
           <ListItemIcon sx={{ minWidth: 32 }}>
             <AddRoundedIcon fontSize="small" />
           </ListItemIcon>
-          <ListItemText primaryTypographyProps={{ fontSize: 16 }}>Add another account</ListItemText>
+          <ListItemText slotProps={{ primary: { fontSize: 16 } }}>Add another account</ListItemText>
         </MenuItem>
 
         <Divider />
@@ -130,7 +130,7 @@ function OptionsMenu({ onLogout, onAddAccount }) {
           onClick={() => { onLogout(); close(); }}
           sx={{ [`& .${listItemIconClasses.root}`]: { ml: 'auto', minWidth: 0 } }}
         >
-          <ListItemText primaryTypographyProps={{ fontSize: 16 }}>Logout</ListItemText>
+          <ListItemText slotProps={{ primary: { fontSize: 16 } }}>Logout</ListItemText>
           <ListItemIcon>
             <LogoutRoundedIcon fontSize="small" />
           </ListItemIcon>
@@ -185,7 +185,7 @@ export default function Layout({ children }) {
         </Box>
         <List>
           {navGroups.map((group, gIdx) => (
-            <Box key={gIdx} component="li" sx={{ listStyle: 'none' }}>
+            <Box key={gIdx}>
               {group.title && (
                 <Box sx={{
                   mt: gIdx === 0 ? 0 : 2,
@@ -223,7 +223,7 @@ export default function Layout({ children }) {
                       <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}>{item.icon}</ListItemIcon>
                       <ListItemText
                         primary={item.label}
-                        primaryTypographyProps={{ fontSize: 17, fontWeight: active ? 600 : 400 }}
+                        slotProps={{ primary: { fontSize: 17, fontWeight: active ? 600 : 400 } }}
                       />
                     </ListItemButton>
                   </ListItem>

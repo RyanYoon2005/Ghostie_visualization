@@ -2,3 +2,7 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 body { margin: 0; }
+
+/* Hide the Ghostie Chrome extension's overlay on the Ghostie app itself —
+   the app already renders this data natively, so the floating card is just noise. */
+#ghostie-overlay-root { display: none !important; }

@@ -17,6 +17,8 @@ import NewspaperIcon from '@mui/icons-material/Newspaper';
 import RssFeedIcon from '@mui/icons-material/RssFeed';
 import ForumIcon from '@mui/icons-material/Forum';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
+import WhatshotIcon from '@mui/icons-material/Whatshot';
+import SearchIcon from '@mui/icons-material/Search';
 import { SentimentBadge } from '../components/SentimentBadge';
 import { StatsCard } from '../components/StatsCard';
 import { EmptyState } from '../components/EmptyState';
@@ -71,6 +73,7 @@ export default function DashboardPage() {
   const [leaderboard, setLeaderboard] = useState([]);
   const [favourites, setFavourites] = useState([]);
   const [companies, setCompanies] = useState([]);
+  const [trending, setTrending] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -78,10 +81,12 @@ export default function DashboardPage() {
       api('/analytical-model/leaderboard').then((r) => r.json()),
       api('/users/me/favourites').then((r) => r.json()),
       api('/data-retrieval/companies').then((r) => r.json()),
-    ]).then(([lb, favs, comps]) => {
+      api('/trending?limit=8').then((r) => r.ok ? r.json() : { trending: [] }).catch(() => ({ trending: [] })),
+    ]).then(([lb, favs, comps, trend]) => {
       setLeaderboard(lb.leaderboard ?? []);
       setFavourites(favs.favourited ?? []);
       setCompanies(comps.companies ?? []);
+      setTrending(trend.trending ?? []);
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
@@ -425,6 +430,77 @@ export default function DashboardPage() {
           </Box>
         </Grid>
       </Grid>
+
+      {/* ── Trending Now ── */}
+      {!loading && trending.length > 0 && (
+        <Box sx={{ ...GLASS, overflow: 'hidden', ...fadeUp(0.4) }}>
+          <Box sx={{
+            px: 2.5, py: 2,
+            borderBottom: '1px solid hsl(35,20%,78%)',
+            display: 'flex', alignItems: 'center', gap: 1,
+          }}>
+            <WhatshotIcon sx={{ fontSize: 20, color: 'hsl(15,55%,42%)' }} />
+            <Box sx={{ flex: 1 }}>
+              <Typography variant="subtitle2" fontWeight={700} sx={{ fontFamily: '"Sora", sans-serif', color: 'hsl(0,0%,12%)' }}>
+                Trending Now
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'hsl(0,0%,40%)' }}>
+                Most-searched businesses across the platform
+              </Typography>
+            </Box>
+          </Box>
+          <Box sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
+            gap: 1,
+            p: 1.5,
+          }}>
+            {trending.slice(0, 8).map((biz, i) => (
+              <Box
+                key={biz.business_key ?? i}
+                onClick={() => goToSentiment(biz)}
+                sx={{
+                  display: 'flex', alignItems: 'center', gap: 1.5,
+                  px: 1.5, py: 1.25, borderRadius: '10px',
+                  border: '1px solid hsl(35,20%,82%)',
+                  bgcolor: 'rgba(160,90,60,0.04)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                  '&:hover': { bgcolor: 'rgba(160,90,60,0.10)', borderColor: 'hsl(15,45%,55%)' },
+                }}
+              >
+                <Box sx={{
+                  width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  bgcolor: i < 3 ? 'rgba(160,90,60,0.18)' : 'rgba(0,0,0,0.05)',
+                  color: i < 3 ? 'hsl(15,55%,32%)' : 'hsl(0,0%,40%)',
+                  fontWeight: 700, fontSize: 14,
+                }}>
+                  {i + 1}
+                </Box>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography variant="body2" fontWeight={600} sx={{ color: 'hsl(0,0%,12%)' }} noWrap>
+                    {biz.business_name}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: 'hsl(0,0%,45%)' }} noWrap>
+                    {biz.location} · {biz.category}
+                  </Typography>
+                </Box>
+                <Box sx={{
+                  display: 'flex', alignItems: 'center', gap: 0.5,
+                  px: 0.75, py: 0.25, borderRadius: 1,
+                  bgcolor: 'rgba(160,90,60,0.12)', flexShrink: 0,
+                }}>
+                  <SearchIcon sx={{ fontSize: 13, color: 'hsl(15,55%,35%)' }} />
+                  <Typography variant="caption" sx={{ color: 'hsl(15,55%,30%)', fontWeight: 700, fontSize: 13 }}>
+                    {biz.search_count}
+                  </Typography>
+                </Box>
+              </Box>
+            ))}
+          </Box>
+        </Box>
+      )}
 
       {/* ── CTA ── */}
       <Box sx={{

@@ -11,6 +11,7 @@ import SentimentPage from './pages/SentimentPage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import HistoryPage from './pages/HistoryPage';
 import FavouritesPage from './pages/FavouritesPage';
+import SavedComparisonsPage from './pages/SavedComparisonsPage';
 import ScoreCardPage from './pages/ScoreCardPage';
 import ComparePage from './pages/ComparePage';
 
@@ -48,6 +49,7 @@ export default function App() {
                         <Route path="/leaderboard" element={<LeaderboardPage />} />
                         <Route path="/history"     element={<HistoryPage />} />
                         <Route path="/favourites"  element={<FavouritesPage />} />
+                        <Route path="/comparisons" element={<SavedComparisonsPage />} />
                       </Routes>
                     </Layout>
                   </ToastProvider>

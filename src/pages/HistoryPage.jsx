@@ -1,4 +1,4 @@
-﻿import { useState, useMemo } from 'react';
+﻿import { useState, useMemo, useEffect } from 'react';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
@@ -23,6 +23,12 @@ import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import DownloadIcon from '@mui/icons-material/Download';
 import ShareIcon from '@mui/icons-material/Share';
 import CheckIcon from '@mui/icons-material/Check';
+import SaveIcon from '@mui/icons-material/Save';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import TextField from '@mui/material/TextField';
 import {
   Area,
   Bar,
@@ -110,6 +116,12 @@ export default function HistoryPage() {
   const [dateRange, setDateRange] = useState('all');
   const [shareCopied, setShareCopied] = useState(false);
 
+  // Saved comparisons — listing/deleting lives on /comparisons; here we only save
+  // (from the toolbar) and auto-load when arriving via ?load=<id>.
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [saveName, setSaveName] = useState('');
+  const [saving, setSaving] = useState(false);
+
   // Canonical day-key: YYYY-MM-DD (sortable lexicographically and unambiguous to parse).
   const toIso = (d) => {
     const dt = new Date(d);
@@ -120,67 +132,67 @@ export default function HistoryPage() {
   const toDateLabel = (iso) =>
     new Date(iso).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: '2-digit' });
 
+  // Load history + sentiment + stock for a single business and shape it into a
+  // chart-ready object. Returns null on failure so callers can filter it out.
+  const loadCompanyData = async (biz, color) => {
+    const params = new URLSearchParams(biz);
+    const stockParams = new URLSearchParams({ business_name: biz.business_name });
+
+    const [historyRes, sentimentRes, stockRes] = await Promise.all([
+      api(`/analytical-model/history?${params}`),
+      api(`/analytical-model/sentiment?${params}`),
+      api(`/data-collection/stock?${stockParams}`).catch(() => null),
+    ]);
+
+    if (!historyRes.ok) return null;
+    const result = await historyRes.json();
+
+    const sentimentByIso = new Map();
+    result.results.forEach((r) => {
+      const iso = toIso(r.date_time);
+      if (iso) sentimentByIso.set(iso, r.overall_score);
+    });
+    const data = Array.from(sentimentByIso.entries()).map(([iso, score]) => ({ iso, score }));
+
+    let snapshot = null;
+    if (sentimentRes.ok) {
+      const sj = await sentimentRes.json();
+      if (!sj.detail) snapshot = sj;
+    }
+
+    let stock = null;
+    if (stockRes && stockRes.ok) {
+      const sj = await stockRes.json().catch(() => ({}));
+      if (sj.price_history?.length) {
+        stock = sj.price_history
+          .map((p) => ({ iso: toIso(p.date), close: p.close }))
+          .filter((p) => p.iso);
+      }
+    }
+
+    return {
+      key: result.business_key,
+      label: biz.business_name,
+      location: biz.location,
+      category: biz.category,
+      color,
+      data,
+      stock,
+      snapshot,
+      results: result.results,
+    };
+  };
+
   const handleAdd = async (e) => {
     e.preventDefault();
     if (companies.length >= SERIES_COLORS.length) return;
     setLoading(true);
     setError('');
     try {
-      const params = new URLSearchParams(business);
-
-      // History (required) + Sentiment snapshot + Stock — all in parallel.
-      const stockParams = new URLSearchParams({ business_name: business.business_name });
-      const [historyRes, sentimentRes, stockRes] = await Promise.all([
-        api(`/analytical-model/history?${params}`),
-        api(`/analytical-model/sentiment?${params}`),
-        api(`/data-collection/stock?${stockParams}`).catch(() => null),
-      ]);
-
-      if (!historyRes.ok) {
-        const err = await historyRes.json().catch(() => ({}));
-        throw new Error(err.detail || 'Could not load history for this company.');
-      }
-      const result = await historyRes.json();
-
-      // Sentiment: deduplicate per day, key by ISO.
-      const sentimentByIso = new Map();
-      result.results.forEach((r) => {
-        const iso = toIso(r.date_time);
-        if (iso) sentimentByIso.set(iso, r.overall_score);
-      });
-      const data = Array.from(sentimentByIso.entries()).map(([iso, score]) => ({ iso, score }));
-
-      // Latest sentiment snapshot — for the per-company leaderboard / source-breakdown chart.
-      let snapshot = null;
-      if (sentimentRes.ok) {
-        const sj = await sentimentRes.json();
-        if (!sj.detail) snapshot = sj;
-      }
-
-      // Stock: same shape, ISO-keyed.
-      let stock = null;
-      if (stockRes && stockRes.ok) {
-        const sj = await stockRes.json().catch(() => ({}));
-        if (sj.price_history?.length) {
-          stock = sj.price_history
-            .map((p) => ({ iso: toIso(p.date), close: p.close }))
-            .filter((p) => p.iso);
-        }
-      }
-
       const color = SERIES_COLORS[companies.length];
-      const label = business.business_name;
-      setCompanies((prev) => [...prev, {
-        key: result.business_key,
-        label,
-        location: business.location,
-        category: business.category,
-        color,
-        data,
-        stock,
-        snapshot,
-        results: result.results,
-      }]);
+      const loaded = await loadCompanyData(business, color);
+      if (!loaded) throw new Error('Could not load history for this company.');
+      setCompanies((prev) => [...prev, loaded]);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -189,6 +201,62 @@ export default function HistoryPage() {
   };
 
   const removeCompany = (key) => setCompanies((prev) => prev.filter((c) => c.key !== key));
+
+  // ── Saved comparisons ──────────────────────────────────────────────────────────
+  // Auto-load when the user arrived from /comparisons with ?load=<id>.
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    const loadId = sp.get('load');
+    if (!loadId) return;
+    setLoading(true);
+    setError('');
+    api(`/users/me/comparisons/${loadId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then(async (cmp) => {
+        if (!cmp || !cmp.businesses) throw new Error('Could not find that saved comparison.');
+        const slots = cmp.businesses.slice(0, SERIES_COLORS.length);
+        const loaded = await Promise.all(
+          slots.map((biz, i) => loadCompanyData(biz, SERIES_COLORS[i]))
+        );
+        const filtered = loaded.filter(Boolean);
+        if (filtered.length === 0) throw new Error('None of the saved companies have data available.');
+        setCompanies(filtered);
+        // Clear the param so the URL stays clean (and Share generates a fresh hash).
+        window.history.replaceState(null, '', window.location.pathname);
+      })
+      .catch((err) => setError(err.message || 'Could not load the comparison.'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleSaveComparison = async () => {
+    if (companies.length < 2 || !saveName.trim()) return;
+    setSaving(true);
+    setError('');
+    try {
+      const res = await api('/users/me/comparisons', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: saveName.trim(),
+          businesses: companies.map((c) => ({
+            business_name: c.label,
+            location: c.location ?? '',
+            category: c.category ?? '',
+          })),
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'Could not save comparison.');
+      }
+      await res.json();
+      setSaveDialogOpen(false);
+      setSaveName('');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleDownloadCsv = () => {
     if (companies.length === 0) return;
@@ -446,6 +514,15 @@ export default function HistoryPage() {
             <Button
               variant="outlined"
               size="small"
+              startIcon={<SaveIcon />}
+              disabled={companies.length < 2}
+              onClick={() => { setSaveName(companies.map((c) => c.label).join(' vs ')); setSaveDialogOpen(true); }}
+            >
+              Save comparison
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
               startIcon={shareCopied ? <CheckIcon /> : <ShareIcon />}
               onClick={handleShareComparison}
               sx={{
@@ -466,6 +543,57 @@ export default function HistoryPage() {
           </Box>
         )}
       </Box>
+
+      {/* Save dialog */}
+      <Dialog
+        open={saveDialogOpen}
+        onClose={() => !saving && setSaveDialogOpen(false)}
+        PaperProps={{ sx: { borderRadius: '14px', bgcolor: 'hsl(40,35%,96%)', minWidth: 400 } }}
+      >
+        <DialogTitle sx={{ fontFamily: '"Sora", sans-serif', color: 'hsl(0,0%,12%)' }}>
+          Save this comparison
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ color: 'hsl(0,0%,35%)', mb: 2 }}>
+            Give this comparison a name so you can load it again later.
+          </Typography>
+          <TextField
+            autoFocus
+            fullWidth
+            label="Name"
+            value={saveName}
+            onChange={(e) => setSaveName(e.target.value)}
+            disabled={saving}
+            onKeyDown={(e) => { if (e.key === 'Enter' && saveName.trim()) handleSaveComparison(); }}
+          />
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 2 }}>
+            {companies.map((c) => (
+              <Chip
+                key={c.key}
+                label={c.label}
+                size="small"
+                sx={{
+                  bgcolor: `${c.color}22`,
+                  border: `1px solid ${c.color}55`,
+                  color: c.color,
+                  fontWeight: 600,
+                }}
+              />
+            ))}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSaveDialogOpen(false)} disabled={saving}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={handleSaveComparison}
+            disabled={saving || !saveName.trim() || companies.length < 2}
+            startIcon={saving ? <CircularProgress size={14} color="inherit" /> : <SaveIcon />}
+          >
+            {saving ? 'Saving…' : 'Save'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Add company to graph — visually distinct from a normal search form */}
       <Box sx={{
