@@ -81,6 +81,26 @@ function OptionsMenu({ onLogout, onAddAccount }) {
         onClose={close}
         transformOrigin={{ horizontal: 'right', vertical: 'top' }}
         anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+        slotProps={{
+          // Repaint the menu paper to the boutique palette — otherwise MUI's
+          // default dark-mode paper renders the popup near-black on cream.
+          paper: {
+            sx: {
+              bgcolor: 'hsl(40,35%,96%)',
+              color: 'hsl(0,0%,15%)',
+              border: '1px solid hsl(35,20%,78%)',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.10)',
+              '& .MuiListItemText-primary':   { color: 'hsl(0,0%,15%)' },
+              '& .MuiListItemText-secondary': { color: 'hsl(0,0%,40%)' },
+              '& .MuiMenuItem-root': {
+                color: 'hsl(0,0%,15%)',
+                '&:hover': { bgcolor: 'rgba(0,0,0,0.05)' },
+              },
+              '& .MuiDivider-root': { borderColor: 'hsl(35,20%,78%)' },
+              '& .MuiListItemIcon-root': { color: 'hsl(0,0%,35%)' },
+            },
+          },
+        }}
         sx={{
           [`& .${listClasses.root}`]: { padding: '4px' },
           [`& .${paperClasses.root}`]: { padding: 0, minWidth: 200 },

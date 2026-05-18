@@ -1,5 +1,6 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { API } from '../api/config';
+import { AUTH_EXPIRED_EVENT } from '../api/client';
 
 const AuthContext = createContext(null);
 
@@ -31,6 +32,12 @@ export function AuthProvider({ children }) {
     return t ? parseToken(t) : null;
   });
   const [accounts, setAccounts] = useState(loadAccounts);
+  // Set to true when an API call comes back 401/403 — drives the "Session expired" banner.
+  const [sessionExpired, setSessionExpired] = useState(false);
+  // Latest token in a ref so the event handler always reads the current value
+  // without depending on `token` and re-binding the listener.
+  const tokenRef = useRef(token);
+  useEffect(() => { tokenRef.current = token; }, [token]);
 
   const _pushToExtension = (newToken) => {
     try {
@@ -133,8 +140,55 @@ export function AuthProvider({ children }) {
     removeAccount(user?.email);
   };
 
+  // Listen for 401/403 events from the API client. Clearing the active token
+  // flips ProtectedRoute → /signin, where the `sessionExpired` flag triggers a
+  // "session expired, please log in again" banner.
+  useEffect(() => {
+    const onExpired = () => {
+      if (!tokenRef.current) return; // already signed out — ignore stragglers
+      setSessionExpired(true);
+      // Inline the logout so we don't capture a stale `user` from closure.
+      const currentEmail = parseToken(tokenRef.current)?.email;
+      setAccounts((prev) => {
+        const updated = prev.filter((a) => a.user.email !== currentEmail);
+        saveAccounts(updated);
+        if (updated.length > 0) {
+          // Promote next saved account silently — fail open rather than kicking
+          // the user fully when they have multiple sessions.
+          localStorage.setItem('ghostie_token', updated[0].token);
+          setToken(updated[0].token);
+          setUser(updated[0].user);
+        } else {
+          localStorage.removeItem('ghostie_token');
+          setToken(null);
+          setUser(null);
+        }
+        return updated;
+      });
+    };
+    window.addEventListener(AUTH_EXPIRED_EVENT, onExpired);
+    return () => window.removeEventListener(AUTH_EXPIRED_EVENT, onExpired);
+  }, []);
+
+  // Clear the banner once any login/signup completes successfully.
+  const wrappedLogin = async (...args) => {
+    await login(...args);
+    setSessionExpired(false);
+  };
+  const wrappedSignup = async (...args) => {
+    await signup(...args);
+    setSessionExpired(false);
+  };
+
   return (
-    <AuthContext.Provider value={{ token, user, accounts, login, signup, logout, switchAccount, removeAccount, isAuthenticated: !!token }}>
+    <AuthContext.Provider value={{
+      token, user, accounts,
+      login: wrappedLogin, signup: wrappedSignup,
+      logout, switchAccount, removeAccount,
+      isAuthenticated: !!token,
+      sessionExpired,
+      clearSessionExpired: () => setSessionExpired(false),
+    }}>
       {children}
     </AuthContext.Provider>
   );

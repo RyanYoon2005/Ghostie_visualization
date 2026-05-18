@@ -23,6 +23,9 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import Collapse from '@mui/material/Collapse';
 import Link from '@mui/material/Link';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import SortIcon from '@mui/icons-material/Sort';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, ResponsiveContainer, Cell,
   LineChart, Line,
@@ -36,6 +39,7 @@ import InfoIcon from '@mui/icons-material/Info';
 import { SentimentBadge } from '../components/SentimentBadge';
 import { StatsCard } from '../components/StatsCard';
 import { ScoreGauge } from '../components/ScoreGauge';
+import { AsxAnnouncements } from '../components/AsxAnnouncements';
 import { makeApiClient } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useFavourites } from '../hooks/useFavourites';
@@ -98,12 +102,16 @@ export default function SentimentPage() {
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
   const [expandedItems, setExpandedItems] = useState(() => new Set());
+  // 'score' is what the backend already returns — the others are user-driven.
+  const [breakdownSort, setBreakdownSort] = useState('score');
 
-  const toggleExpanded = (idx) => {
+  // Use a stable identifier per item so expansion state survives re-sorting.
+  const itemKey = (item, i) => item.id ?? `${item.source}__${item.title ?? ''}__${i}`;
+  const toggleExpanded = (key) => {
     setExpandedItems((prev) => {
       const next = new Set(prev);
-      if (next.has(idx)) next.delete(idx);
-      else next.add(idx);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   };
@@ -766,6 +774,9 @@ export default function SentimentPage() {
             );
           })()}
 
+          {/* ASX announcements — hidden automatically when the business isn't ASX-listed */}
+          <AsxAnnouncements api={api} business={business} animationDelay={0.13} />
+
           {/* Stock — only when business is publicly listed */}
           {stock && stock.price_history?.length > 0 && (() => {
             const up = (stock.quote?.change_percent ?? 0) >= 0;
@@ -855,7 +866,23 @@ export default function SentimentPage() {
           })()}
 
           {/* Breakdown */}
-          {result.breakdown?.length > 0 && (
+          {result.breakdown?.length > 0 && (() => {
+            // Derived: a sorted shallow copy of the breakdown driven by the dropdown.
+            // 'score' is the backend's default (already sorted highest first).
+            const sortedBreakdown = (() => {
+              const arr = [...result.breakdown];
+              switch (breakdownSort) {
+                case 'score-asc':   return arr.sort((a, b) => (a.score ?? 0) - (b.score ?? 0));
+                case 'source':      return arr.sort((a, b) => (a.source ?? '').localeCompare(b.source ?? ''));
+                case 'rating':      return arr.sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
+                case 'length':      return arr.sort((a, b) => (b.body ?? b.text ?? '').length - (a.body ?? a.text ?? '').length);
+                case 'title':       return arr.sort((a, b) => (a.title ?? '').localeCompare(b.title ?? ''));
+                case 'score':
+                default:            return arr.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+              }
+            })();
+
+            return (
             <Box sx={{
               borderRadius: '12px',
               border: '1px solid hsl(35,20%,78%)',
@@ -863,33 +890,78 @@ export default function SentimentPage() {
               overflow: 'hidden',
               ...fadeUp(0.15),
             }}>
-              <Box sx={{ px: 2.5, py: 1.5, borderBottom: '1px solid hsl(35,20%,78%)', bgcolor: 'rgba(0,0,0,0.035)' }}>
-                <Typography variant="subtitle2" fontWeight={600} sx={{ fontFamily: '"Sora", sans-serif', color: 'hsl(0,0%,12%)' }}>
-                  Source Breakdown
-                </Typography>
-                <Typography variant="caption" sx={{ color: 'hsl(0,0%,40%)' }}>
-                  {result.breakdown.length} items from reviews, news and social media
-                </Typography>
+              <Box sx={{
+                px: 2.5, py: 1.5,
+                borderBottom: '1px solid hsl(35,20%,78%)',
+                bgcolor: 'rgba(0,0,0,0.035)',
+                display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap',
+              }}>
+                <Box sx={{ flex: 1, minWidth: 200 }}>
+                  <Typography variant="subtitle2" fontWeight={600} sx={{ fontFamily: '"Sora", sans-serif', color: 'hsl(0,0%,12%)' }}>
+                    Source Breakdown
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: 'hsl(0,0%,40%)' }}>
+                    {result.breakdown.length} items from reviews, news and social media
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <SortIcon sx={{ fontSize: 18, color: 'hsl(0,0%,40%)' }} />
+                  <Select
+                    size="small"
+                    value={breakdownSort}
+                    onChange={(e) => setBreakdownSort(e.target.value)}
+                    sx={{
+                      fontSize: 14, color: 'hsl(0,0%,20%)',
+                      bgcolor: 'hsl(40,35%,98%)',
+                      '& .MuiOutlinedInput-notchedOutline': { borderColor: 'hsl(35,20%,70%)' },
+                      '& .MuiSelect-select': { py: 0.6, pl: 1.25 },
+                    }}
+                    MenuProps={{
+                      slotProps: {
+                        paper: {
+                          sx: {
+                            bgcolor: 'hsl(40,35%,96%)',
+                            color: 'hsl(0,0%,15%)',
+                            border: '1px solid hsl(35,20%,78%)',
+                            '& .MuiMenuItem-root': {
+                              fontSize: 14,
+                              '&:hover': { bgcolor: 'rgba(0,0,0,0.05)' },
+                              '&.Mui-selected': { bgcolor: 'rgba(160,90,60,0.10)', color: 'hsl(15,45%,32%)' },
+                            },
+                          },
+                        },
+                      },
+                    }}
+                  >
+                    <MenuItem value="score">Highest score first</MenuItem>
+                    <MenuItem value="score-asc">Lowest score first</MenuItem>
+                    <MenuItem value="source">Source (A → Z)</MenuItem>
+                    <MenuItem value="rating">Highest rating</MenuItem>
+                    <MenuItem value="length">Longest text first</MenuItem>
+                    <MenuItem value="title">Title (A → Z)</MenuItem>
+                  </Select>
+                </Box>
               </Box>
 
-              {result.breakdown.map((item, i) => {
+              {sortedBreakdown.map((item, i) => {
                 const ds = item.score;
                 const color = scoreColor(ds);
                 const src = sourceLabel(item.source);
                 const srcColor = sourceColor(item.source);
                 const fullText = item.body || item.text || '';
-                const isExpanded = expandedItems.has(i);
+                const key = itemKey(item, i);
+                const isExpanded = expandedItems.has(key);
                 const TRUNCATE = 220;
                 const isTruncatable = fullText.length > TRUNCATE;
                 const previewText = isTruncatable ? `${fullText.slice(0, TRUNCATE).trimEnd()}…` : fullText;
 
                 return (
                   <Box
-                    key={i}
-                    onClick={() => toggleExpanded(i)}
+                    key={key}
+                    onClick={() => toggleExpanded(key)}
                     sx={{
                       px: 2.5, py: 2,
-                      borderBottom: i < result.breakdown.length - 1 ? '1px solid hsl(35,20%,75%)' : 'none',
+                      borderBottom: i < sortedBreakdown.length - 1 ? '1px solid hsl(35,20%,75%)' : 'none',
                       cursor: 'pointer',
                       '&:hover': { bgcolor: 'rgba(0,0,0,0.025)' },
                       transition: 'background 0.15s',
@@ -991,7 +1063,8 @@ export default function SentimentPage() {
                 );
               })}
             </Box>
-          )}
+            );
+          })()}
         </Box>
       )}
     </Box>

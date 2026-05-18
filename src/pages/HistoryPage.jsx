@@ -47,6 +47,7 @@ import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import { SentimentBadge } from '../components/SentimentBadge';
 import { StatsCard } from '../components/StatsCard';
+import { AsxAnnouncements } from '../components/AsxAnnouncements';
 import { makeApiClient } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { BusinessPicker } from '../components/BusinessPicker';
@@ -1076,6 +1077,18 @@ export default function HistoryPage() {
               </ResponsiveContainer>
             </Box>
           )}
+
+          {/* ASX announcements per company — each card hides itself if the business
+              isn't ASX-listed, so this only ever shows the ones that have data. */}
+          {companies.map((c, i) => (
+            <AsxAnnouncements
+              key={`asx-${c.key}`}
+              api={api}
+              business={{ business_name: c.label, location: c.location, category: c.category }}
+              defaultExpanded={false}
+              animationDelay={0.18 + i * 0.04}
+            />
+          ))}
 
           {/* Per-company timeline tables */}
           {companies.map((c) => (

@@ -74,7 +74,7 @@ const FormCard = styled(Card)(({ theme }) => ({
 }));
 
 export default function SignInPage() {
-  const { login } = useAuth();
+  const { login, sessionExpired, clearSessionExpired } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const addAccount = location.state?.addAccount ?? false;
@@ -142,6 +142,12 @@ export default function SignInPage() {
           <Typography component="h1" variant="h4" sx={{ fontSize: 'clamp(2rem, 10vw, 2.15rem)' }}>
             Sign in
           </Typography>
+
+          {sessionExpired && !apiError && (
+            <Alert severity="warning" onClose={clearSessionExpired}>
+              Your session has expired. Please log in again to continue.
+            </Alert>
+          )}
 
           {apiError && <Alert severity="error">{apiError}</Alert>}
 

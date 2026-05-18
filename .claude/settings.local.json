@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\OfficePC7\\\\code\\\\Ghostie_visualization\" -Force)"
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\OfficePC7\\\\code\\\\Ghostie_visualization\" -Force)",
+      "Bash(npm test *)",
+      "Bash(npm run *)"
     ]
   }
 }
