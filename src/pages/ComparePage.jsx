@@ -83,7 +83,7 @@ async function loadCompany({ business_name, location, category }, color) {
 
   const [historyRes, sentimentRes, stockRes] = await Promise.all([
     publicFetch(`/analytical-model/history?${params}`),
-    publicFetch(`/analytical-model/sentiment?${params}`),
+    publicFetch(`/analyse?${params}`),
     publicFetch(`/data-collection/stock?${stockParams}`).catch(() => null),
   ]);
 

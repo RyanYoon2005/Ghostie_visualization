@@ -98,7 +98,6 @@ export default function SentimentPage() {
   const [stock, setStock] = useState(null);
   const [businessKey, setBusinessKey] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [loadingStage, setLoadingStage] = useState(''); // 'analysing' | 'collecting' | 'reanalysing'
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
   const [expandedItems, setExpandedItems] = useState(() => new Set());
@@ -219,35 +218,9 @@ export default function SentimentPage() {
     showToast('CSV downloaded', 'success');
   };
 
-  // Run /analytical-model/sentiment. Returns {ok, json, status}.
-  const fetchSentiment = async (params) => {
-    const res = await api(`/analytical-model/sentiment?${params}`);
-    const json = await res.json().catch(() => ({}));
-    return { ok: res.ok, status: res.status, json };
-  };
-
-  // Trigger /collect for the current business and wait for completion.
-  const collect = async () => {
-    const res = await api('/data-collection/collect', {
-      method: 'POST',
-      body: JSON.stringify(business),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Could not collect data for this business.');
-    }
-    return res.json();
-  };
-
-  // A sentiment "miss" — either an explicit not-found or a 0-item result.
-  const isNoData = ({ ok, status, json }) =>
-    status === 404 ||
-    (ok && (json.items_analysed === 0 || json.overall_score == null));
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setLoadingStage('analysing');
     setError('');
     setResult(null);
     setCompetitor(null);
@@ -256,32 +229,25 @@ export default function SentimentPage() {
     setExpandedItems(new Set());
     try {
       const params = new URLSearchParams(business);
-      let sentiment = await fetchSentiment(params);
 
-      // If no record yet, run collection then retry the analysis.
-      if (isNoData(sentiment)) {
-        setLoadingStage('collecting');
-        const collectResult = await collect();
-        if ((collectResult.total_results ?? 0) === 0) {
-          throw new Error(`No public data found for "${business.business_name}" in ${business.location}. Try a more specific name or different location.`);
-        }
-        refreshCompanies();
-        setLoadingStage('reanalysing');
-        sentiment = await fetchSentiment(params);
+      // Single call: /analyse handles collect → store → analyse on the backend
+      // and returns the finished sentiment payload. We just wait for it — no
+      // timeout, no polling, no client-side orchestration.
+      const res = await api(`/analyse?${params}`);
+      const sentiment = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(sentiment.detail || 'Analysis failed');
+      }
+      if (sentiment.items_analysed === 0 || sentiment.overall_score == null) {
+        throw new Error(`No public data found for "${business.business_name}" in ${business.location}. Try a more specific name or different location.`);
       }
 
-      if (!sentiment.ok) {
-        throw new Error(sentiment.json.detail || 'Request failed');
-      }
-      if (isNoData(sentiment)) {
-        throw new Error('Collection ran but the analysis produced no signals. Try again in a moment.');
-      }
-
-      setResult(sentiment.json);
+      setResult(sentiment);
+      refreshCompanies();
       const key = await computeKey(business.business_name, business.location, business.category);
       setBusinessKey(key);
 
-      // Side-by-side enrichments — failures here don't block the main result
+      // Side-by-side enrichments — failures here don't block the main result.
       api(`/analytical-model/competitor-gap?${params}`)
         .then((r) => (r.ok ? r.json() : null))
         .then((data) => { if (data && !data.detail) setCompetitor(data); })
@@ -296,7 +262,6 @@ export default function SentimentPage() {
       setError(err.message);
     } finally {
       setLoading(false);
-      setLoadingStage('');
     }
   };
 
@@ -352,11 +317,7 @@ export default function SentimentPage() {
             </Button>
             {loading && (
               <Typography variant="body2" sx={{ color: 'hsl(0,0%,35%)' }}>
-                {loadingStage === 'collecting'
-                  ? 'No record found — collecting fresh data (this can take up to a minute)…'
-                  : loadingStage === 'reanalysing'
-                  ? 'Data collected — running sentiment analysis…'
-                  : 'Analysing sentiment…'}
+                Analysing — collecting fresh data, scoring sentiment and persisting it. First-time runs can take a couple of minutes…
               </Typography>
             )}
           </Box>
@@ -917,17 +878,28 @@ export default function SentimentPage() {
                       '& .MuiSelect-select': { py: 0.6, pl: 1.25 },
                     }}
                     MenuProps={{
-                      slotProps: {
-                        paper: {
-                          sx: {
-                            bgcolor: 'hsl(40,35%,96%)',
-                            color: 'hsl(0,0%,15%)',
-                            border: '1px solid hsl(35,20%,78%)',
-                            '& .MuiMenuItem-root': {
-                              fontSize: 14,
-                              '&:hover': { bgcolor: 'rgba(0,0,0,0.05)' },
-                              '&.Mui-selected': { bgcolor: 'rgba(160,90,60,0.10)', color: 'hsl(15,45%,32%)' },
-                            },
+                      // !important + backgroundImage:none defeat the MuiPaper
+                      // elevation overlay that otherwise paints the dropdown near-black.
+                      PaperProps: {
+                        sx: {
+                          bgcolor: 'hsl(40,35%,96%) !important',
+                          backgroundImage: 'none !important',
+                          color: 'hsl(0,0%,15%)',
+                          border: '1px solid hsl(35,20%,78%)',
+                          boxShadow: '0 8px 24px rgba(0,0,0,0.10)',
+                        },
+                      },
+                      sx: {
+                        '& .MuiMenuItem-root': {
+                          color: 'hsl(0,0%,15%)',
+                          fontSize: 14,
+                          '&:hover': { bgcolor: 'rgba(0,0,0,0.05)' },
+                          '&.Mui-selected': {
+                            bgcolor: 'rgba(160,90,60,0.10) !important',
+                            color: 'hsl(15,45%,32%)',
+                          },
+                          '&.Mui-selected:hover': {
+                            bgcolor: 'rgba(160,90,60,0.18) !important',
                           },
                         },
                       },

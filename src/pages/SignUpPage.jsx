@@ -16,7 +16,9 @@ import { useAuth } from '../auth/AuthContext';
 
 const PageStack = styled(Stack)(({ theme }) => ({
   minHeight: '100dvh',
+  position: 'relative',
   padding: theme.spacing(2),
+  backgroundColor: 'hsl(40, 30%, 92%)',
   [theme.breakpoints.up('sm')]: { padding: theme.spacing(4) },
   '&::before': {
     content: '""',
@@ -24,14 +26,16 @@ const PageStack = styled(Stack)(({ theme }) => ({
     position: 'absolute',
     zIndex: -1,
     inset: 0,
-    backgroundImage: 'radial-gradient(ellipse at 50% 50%, hsl(210, 100%, 97%), hsl(0, 0%, 100%))',
+    backgroundImage:
+      'radial-gradient(ellipse at 50% 30%, hsl(40, 40%, 96%) 0%, hsl(40, 30%, 92%) 45%, hsl(35, 25%, 88%) 100%)',
     backgroundRepeat: 'no-repeat',
-    ...theme.applyStyles('dark', {
-      backgroundImage: 'radial-gradient(at 50% 50%, hsla(210, 100%, 16%, 0.5), hsl(220, 30%, 5%))',
-    }),
   },
 }));
 
+// Matches the dashed-border boutique panel used by the analysis query forms.
+// `!important` + `backdropFilter: none` defeat the global MuiCard.outlined
+// variant override which otherwise blurs the cream page through the card and
+// makes it look grey.
 const FormCard = styled(Card)(({ theme }) => ({
   display: 'flex',
   flexDirection: 'column',
@@ -40,13 +44,15 @@ const FormCard = styled(Card)(({ theme }) => ({
   padding: theme.spacing(4),
   gap: theme.spacing(2),
   margin: 'auto',
-  boxShadow:
-    'hsla(220, 30%, 5%, 0.05) 0px 5px 15px 0px, hsla(220, 25%, 10%, 0.05) 0px 15px 35px -5px',
+  borderRadius: 14,
+  backgroundColor: 'hsl(40, 40%, 93%) !important',
+  backgroundImage: 'none !important',
+  backdropFilter: 'none !important',
+  WebkitBackdropFilter: 'none !important',
+  color: 'hsl(0, 0%, 12%)',
+  border: '1px dashed hsl(35, 20%, 60%) !important',
+  boxShadow: 'none',
   [theme.breakpoints.up('sm')]: { width: 450 },
-  ...theme.applyStyles('dark', {
-    boxShadow:
-      'hsla(220, 30%, 5%, 0.5) 0px 5px 15px 0px, hsla(220, 25%, 10%, 0.08) 0px 15px 35px -5px',
-  }),
 }));
 
 export default function SignUpPage() {
@@ -85,7 +91,7 @@ export default function SignUpPage() {
 
   return (
     <PageStack direction="column" sx={{ justifyContent: 'center' }}>
-      <FormCard variant="outlined">
+      <FormCard>
         <Typography variant="h4" fontWeight={700}>Ghostie</Typography>
         <Typography component="h1" variant="h4" sx={{ fontSize: 'clamp(2rem, 10vw, 2.15rem)' }}>
           Create account

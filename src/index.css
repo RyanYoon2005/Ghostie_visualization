@@ -6,3 +6,19 @@ body { margin: 0; }
 /* Hide the Ghostie Chrome extension's overlay on the Ghostie app itself —
    the app already renders this data natively, so the floating card is just noise. */
 #ghostie-overlay-root { display: none !important; }
+
+/* Suppress Chrome / Edge / Safari's blue autofill background on inputs.
+   We paint our own warm-cream fill via an inset box-shadow because the actual
+   background-color of an autofilled input can't be set directly by the page. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px hsl(40, 35%, 96%) inset !important;
+          box-shadow: 0 0 0 1000px hsl(40, 35%, 96%) inset !important;
+  -webkit-text-fill-color: hsl(0, 0%, 12%) !important;
+  caret-color: hsl(0, 0%, 12%);
+  transition: background-color 5000s ease-in-out 0s;
+}

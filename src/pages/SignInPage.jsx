@@ -41,22 +41,29 @@ const features = [
   },
 ];
 
-const PageStack = styled(Stack)(({ theme }) => ({
+const PageStack = styled(Stack)(() => ({
   minHeight: '100dvh',
+  position: 'relative',
+  backgroundColor: 'hsl(40, 30%, 92%)',
   '&::before': {
     content: '""',
     display: 'block',
     position: 'absolute',
     zIndex: -1,
     inset: 0,
-    backgroundImage: 'radial-gradient(ellipse at 50% 50%, hsl(210, 100%, 97%), hsl(0, 0%, 100%))',
+    // Warm cream radial wash — matches the boutique palette used everywhere else.
+    backgroundImage:
+      'radial-gradient(ellipse at 50% 30%, hsl(40, 40%, 96%) 0%, hsl(40, 30%, 92%) 45%, hsl(35, 25%, 88%) 100%)',
     backgroundRepeat: 'no-repeat',
-    ...theme.applyStyles('dark', {
-      backgroundImage: 'radial-gradient(at 50% 50%, hsla(210, 100%, 16%, 0.5), hsl(220, 30%, 5%))',
-    }),
   },
 }));
 
+// Matches the dashed-border boutique panel used by the analysis query forms
+// ("Analyse a business" / "Add a company to the comparison graph") so sign-in
+// feels like the same surface family.
+// `!important` + explicit `backdropFilter: none` are needed to defeat the
+// global MuiCard.outlined variant override (which paints a blurred semi-
+// transparent surface and was making the card look grey).
 const FormCard = styled(Card)(({ theme }) => ({
   display: 'flex',
   flexDirection: 'column',
@@ -64,13 +71,15 @@ const FormCard = styled(Card)(({ theme }) => ({
   width: '100%',
   padding: theme.spacing(4),
   gap: theme.spacing(2),
-  boxShadow:
-    'hsla(220, 30%, 5%, 0.05) 0px 5px 15px 0px, hsla(220, 25%, 10%, 0.05) 0px 15px 35px -5px',
+  borderRadius: 14,
+  backgroundColor: 'hsl(40, 40%, 93%) !important',
+  backgroundImage: 'none !important',
+  backdropFilter: 'none !important',
+  WebkitBackdropFilter: 'none !important',
+  color: 'hsl(0, 0%, 12%)',
+  border: '1px dashed hsl(35, 20%, 60%) !important',
+  boxShadow: 'none',
   [theme.breakpoints.up('sm')]: { width: 450 },
-  ...theme.applyStyles('dark', {
-    boxShadow:
-      'hsla(220, 30%, 5%, 0.5) 0px 5px 15px 0px, hsla(220, 25%, 10%, 0.08) 0px 15px 35px -5px',
-  }),
 }));
 
 export default function SignInPage() {
@@ -135,7 +144,7 @@ export default function SignInPage() {
         </Stack>
 
         {/* Right — sign-in card */}
-        <FormCard variant="outlined">
+        <FormCard>
           <Typography variant="h4" fontWeight={700} sx={{ display: { xs: 'block', md: 'none' } }}>
             Ghostie
           </Typography>

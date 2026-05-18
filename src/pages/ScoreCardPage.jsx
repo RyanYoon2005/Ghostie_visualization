@@ -112,7 +112,7 @@ export default function ScoreCardPage() {
 
     const params = new URLSearchParams({ business_name: decodedName, location, category });
     Promise.all([
-      publicFetch(`/analytical-model/sentiment?${params}`).then((r) => r.json()),
+      publicFetch(`/analyse?${params}`).then((r) => r.json()),
       publicFetch(`/analytical-model/history?${params}`).then((r) => r.json()).catch(() => ({})),
     ]).then(([sent, hist]) => {
       if (sent.detail) throw new Error(sent.detail);

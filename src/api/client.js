@@ -10,7 +10,7 @@ export const AUTH_EXPIRED_EVENT = 'ghostie:auth-expired';
  *
  * Usage:
  *   const api = makeApiClient(token);
- *   const res = await api('/analytical-model/sentiment?...');
+ *   const res = await api('/analyse?...');
  */
 export function makeApiClient(token) {
   return async (path, options = {}) => {

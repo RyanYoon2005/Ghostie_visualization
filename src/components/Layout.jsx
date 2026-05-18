@@ -81,30 +81,31 @@ function OptionsMenu({ onLogout, onAddAccount }) {
         onClose={close}
         transformOrigin={{ horizontal: 'right', vertical: 'top' }}
         anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-        slotProps={{
-          // Repaint the menu paper to the boutique palette — otherwise MUI's
-          // default dark-mode paper renders the popup near-black on cream.
-          paper: {
-            sx: {
-              bgcolor: 'hsl(40,35%,96%)',
-              color: 'hsl(0,0%,15%)',
-              border: '1px solid hsl(35,20%,78%)',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.10)',
-              '& .MuiListItemText-primary':   { color: 'hsl(0,0%,15%)' },
-              '& .MuiListItemText-secondary': { color: 'hsl(0,0%,40%)' },
-              '& .MuiMenuItem-root': {
-                color: 'hsl(0,0%,15%)',
-                '&:hover': { bgcolor: 'rgba(0,0,0,0.05)' },
-              },
-              '& .MuiDivider-root': { borderColor: 'hsl(35,20%,78%)' },
-              '& .MuiListItemIcon-root': { color: 'hsl(0,0%,35%)' },
-            },
-          },
-        }}
+        // Repaint the menu paper + its contents directly via sx selectors.
+        // slotProps.paper alone wasn't winning the cascade in MUI v9, so we
+        // target the rendered class names with higher specificity.
         sx={{
           [`& .${listClasses.root}`]: { padding: '4px' },
-          [`& .${paperClasses.root}`]: { padding: 0, minWidth: 200 },
-          [`& .${dividerClasses.root}`]: { margin: '4px -4px' },
+          [`& .${paperClasses.root}`]: {
+            padding: 0,
+            minWidth: 200,
+            bgcolor: 'hsl(40,35%,96%) !important',
+            backgroundImage: 'none !important',
+            color: 'hsl(0,0%,15%)',
+            border: '1px solid hsl(35,20%,78%)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.10)',
+          },
+          [`& .${dividerClasses.root}`]: {
+            margin: '4px -4px',
+            borderColor: 'hsl(35,20%,78%) !important',
+          },
+          '& .MuiMenuItem-root': {
+            color: 'hsl(0,0%,15%)',
+            '&:hover': { bgcolor: 'rgba(0,0,0,0.05)' },
+          },
+          '& .MuiListItemText-primary':   { color: 'hsl(0,0%,15%)' },
+          '& .MuiListItemText-secondary': { color: 'hsl(0,0%,40%)' },
+          '& .MuiListItemIcon-root':      { color: 'hsl(0,0%,35%)' },
         }}
       >
         {/* Current account */}

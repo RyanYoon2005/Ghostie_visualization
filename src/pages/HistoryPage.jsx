@@ -155,7 +155,7 @@ export default function HistoryPage() {
 
     const [historyRes, sentimentRes, stockRes] = await Promise.all([
       api(`/analytical-model/history?${params}`),
-      api(`/analytical-model/sentiment?${params}`),
+      api(`/analyse?${params}`),
       api(`/data-collection/stock?${stockParams}`).catch(() => null),
     ]);
 
